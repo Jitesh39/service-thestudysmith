@@ -366,10 +366,25 @@ Alternatively, share your details with us, and our team will get back to you wit
                             <Send size={18} />
                         </button>
                     </form>
-                    <div className="text-center mt-2">
-                        <a href="https://wa.me/919508086078?text=Hi!%20I%20visited%20TheStudySmith%20website%20and%20would%20like%20to%20know%20more%20about%20your%20Web%20Development%20services.%0AMessage%20from%3A%20Services-TheStudySmith%0AWebsite%20inquiry" target="_blank" rel="noopener noreferrer" className="text-xs text-slate-400 hover:text-blue-600 transition-colors flex items-center justify-center gap-1">
-                            Powered by TheStudySmith
-                        </a>
+                    <div className="text-center mt-4 mb-2 flex items-center justify-center gap-1 text-xs text-slate-800">
+                        Powered by
+                        <Link
+                            href="https://thestudysmith9.wordpress.com"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-blue-600 transition-colors font-semibold"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                const target = e.currentTarget;
+                                target.classList.add("animate-pulse", "text-blue-500");
+                                setTimeout(() => {
+                                    target.classList.remove("animate-pulse", "text-blue-500");
+                                    window.open("https://thestudysmith9.wordpress.com", "_blank");
+                                }, 500);
+                            }}
+                        >
+                            TheStudySmith
+                        </Link>
                     </div>
                 </div>
             </div>

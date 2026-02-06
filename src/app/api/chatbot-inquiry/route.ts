@@ -27,7 +27,7 @@ export async function POST(request: Request) {
         await resend.emails.send({
             from: "TheStudySmith Chatbot <onboarding@resend.dev>",
             to: [adminEmail],
-            subject: "📩 Service Inquiry - From Chatbot",
+            subject: "Service Inquiry - From Chatbot",
             html: `
                 <h3>New Chatbot Inquiry Received</h3>
                 <p><b>Type:</b> ${formType === 'inquiry' ? 'Service Inquiry' : 'Callback Request'}</p>

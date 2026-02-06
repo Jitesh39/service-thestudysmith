@@ -8,6 +8,7 @@ export default function WhatsAppButton() {
     const pathname = usePathname();
 
     // Don't show on dashboard pages
+    
     if (pathname?.startsWith("/dashboard")) {
         return null;
     }
