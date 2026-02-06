@@ -23,6 +23,8 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Newsletter from "@/components/Newsletter";
 import InquiryForm from "@/components/InquiryForm";
+import TiltWrapper from "@/components/TiltWrapper";
+import { FadeUp, FadeIn, ScaleIn } from "@/components/MotionWrappers";
 
 export default function Home() {
   const faqs = [
@@ -41,29 +43,37 @@ export default function Home() {
       {/* Hero Section */}
       <section className="hero-section text-center">
         <div className="container">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-primary text-sm font-medium mb-6 border border-blue-100">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-80"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-            </span>
-            Static website project services available
-          </div>
-          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-10 max-w-4xl mx-auto">
-            Level Up Your Web Projects <br className="hidden md:block" />
-            <span className="text-primary">with Expert Developers</span>
-          </h1>
-          <p className="text-lg md:text-xl text-slate-600 mb-9 max-w-2xl mx-auto leading-relaxed">
-            Secure your degree with university-approved projects by TheStudySmith, including full source code, documentation, and explanation support.
-            <Link href="https://thestudysmith9.wordpress.com/" target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-900 hover:underline"> TheStudySmith</Link>.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="#contact" className="btn btn-primary w-full sm:w-auto justify-center">
-              Get Your Project <ArrowRight size={18} />
-            </Link>
-            <Link href="/login" className="btn btn-outline w-full sm:w-auto justify-center">
-              Client Portal
-            </Link>
-          </div>
+          <ScaleIn delay={0.2}>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-primary text-sm font-medium mb-6 border border-blue-100">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-80"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+              </span>
+              Static website project services available
+            </div>
+          </ScaleIn>
+          <FadeUp delay={0.4}>
+            <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-10 max-w-4xl mx-auto">
+              Level Up Your Web Projects <br className="hidden md:block" />
+              <span className="text-primary">with Expert Developers</span>
+            </h1>
+          </FadeUp>
+          <FadeUp delay={0.6}>
+            <p className="text-lg md:text-xl text-slate-600 mb-9 max-w-2xl mx-auto leading-relaxed">
+              Secure your degree with university-approved projects by TheStudySmith, including full source code, documentation, and explanation support.
+              <Link href="https://thestudysmith9.wordpress.com/" target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-900 hover:underline"> TheStudySmith</Link>.
+            </p>
+          </FadeUp>
+          <FadeUp delay={0.8}>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link href="#contact" className="btn btn-primary w-full sm:w-auto justify-center">
+                Get Your Project <ArrowRight size={18} />
+              </Link>
+              <Link href="/login" className="btn btn-outline w-full sm:w-auto justify-center">
+                Client Portal
+              </Link>
+            </div>
+          </FadeUp>
         </div>
       </section>
 
@@ -98,46 +108,52 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
             {/* Demo Card 1 */}
-            <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
-              <div className="h-48 bg-slate-200 flex items-center justify-center relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-indigo-600 opacity-90 group-hover:scale-105 transition-transform duration-500"></div>
-                <span className="relative text-white font-bold text-xl">E-Commerce Platform</span>
+            <TiltWrapper>
+              <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-100 hover:shadow-xl transition-all duration-300 group h-full">
+                <div className="h-48 bg-slate-200 flex items-center justify-center relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-indigo-600 opacity-90 group-hover:scale-105 transition-transform duration-500"></div>
+                  <span className="relative text-white font-bold text-xl">E-Commerce Platform</span>
+                </div>
+                <div className="p-6">
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">ShopMaster Pro</h3>
+                  <p className="text-slate-600 text-sm mb-4 leading-relaxed">
+                    A fully functional e-commerce web application with admin dashboard.
+                  </p>
+                </div>
               </div>
-              <div className="p-6">
-                <h3 className="text-xl font-bold text-slate-900 mb-2">ShopMaster Pro</h3>
-                <p className="text-slate-600 text-sm mb-4 leading-relaxed">
-                  A fully functional e-commerce web application with admin dashboard.
-                </p>
-              </div>
-            </div>
+            </TiltWrapper>
 
             {/* Demo Card 2 */}
-            <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
-              <div className="h-48 bg-slate-200 flex items-center justify-center relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-teal-600 opacity-90 group-hover:scale-105 transition-transform duration-500"></div>
-                <span className="relative text-white font-bold text-xl">Hospital Management</span>
+            <TiltWrapper>
+              <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-100 hover:shadow-xl transition-all duration-300 group h-full">
+                <div className="h-48 bg-slate-200 flex items-center justify-center relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-teal-600 opacity-90 group-hover:scale-105 transition-transform duration-500"></div>
+                  <span className="relative text-white font-bold text-xl">Hospital Management</span>
+                </div>
+                <div className="p-6">
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">MediCare System</h3>
+                  <p className="text-slate-600 text-sm mb-4 leading-relaxed">
+                    Comprehensive hospital management system handling patient records.
+                  </p>
+                </div>
               </div>
-              <div className="p-6">
-                <h3 className="text-xl font-bold text-slate-900 mb-2">MediCare System</h3>
-                <p className="text-slate-600 text-sm mb-4 leading-relaxed">
-                  Comprehensive hospital management system handling patient records.
-                </p>
-              </div>
-            </div>
+            </TiltWrapper>
 
             {/* Demo Card 3 */}
-            <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
-              <div className="h-48 bg-slate-200 flex items-center justify-center relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-purple-600 opacity-90 group-hover:scale-105 transition-transform duration-500"></div>
-                <span className="relative text-white font-bold text-xl">AI Content Generator</span>
+            <TiltWrapper>
+              <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-100 hover:shadow-xl transition-all duration-300 group h-full">
+                <div className="h-48 bg-slate-200 flex items-center justify-center relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-purple-600 opacity-90 group-hover:scale-105 transition-transform duration-500"></div>
+                  <span className="relative text-white font-bold text-xl">AI Content Generator</span>
+                </div>
+                <div className="p-6">
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">ContentAI</h3>
+                  <p className="text-slate-600 text-sm mb-4 leading-relaxed">
+                    SaaS application leveraging AI to generate blog posts automatically.
+                  </p>
+                </div>
               </div>
-              <div className="p-6">
-                <h3 className="text-xl font-bold text-slate-900 mb-2">ContentAI</h3>
-                <p className="text-slate-600 text-sm mb-4 leading-relaxed">
-                  SaaS application leveraging AI to generate blog posts automatically.
-                </p>
-              </div>
-            </div>
+            </TiltWrapper>
           </div>
 
           <div className="text-center">
@@ -157,21 +173,27 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="card">
-              <div className="feature-icon"><FileCode size={24} /></div>
-              <h3 className="text-xl font-bold mb-3">Full Source Code</h3>
-              <p>Clean, well-structured, and commented code that is easy to understand and modify.</p>
-            </div>
-            <div className="card">
-              <div className="feature-icon"><BookOpen size={24} /></div>
-              <h3 className="text-xl font-bold mb-3">Complete Documentation</h3>
-              <p>Includes Synopsis, SRS, DFDs, ER Diagrams, and Testing Reports required for submission.</p>
-            </div>
-            <div className="card">
-              <div className="feature-icon"><MonitorPlay size={24} /></div>
-              <h3 className="text-xl font-bold mb-3">Setup & Explanation</h3>
-              <p>We help you run the project on your laptop and explain the code logic for your viva.</p>
-            </div>
+            <TiltWrapper>
+              <div className="card h-full">
+                <div className="feature-icon"><FileCode size={24} /></div>
+                <h3 className="text-xl font-bold mb-3">Full Source Code</h3>
+                <p>Clean, well-structured, and commented code that is easy to understand and modify.</p>
+              </div>
+            </TiltWrapper>
+            <TiltWrapper>
+              <div className="card h-full">
+                <div className="feature-icon"><BookOpen size={24} /></div>
+                <h3 className="text-xl font-bold mb-3">Complete Documentation</h3>
+                <p>Includes Synopsis, SRS, DFDs, ER Diagrams, and Testing Reports required for submission.</p>
+              </div>
+            </TiltWrapper>
+            <TiltWrapper>
+              <div className="card h-full">
+                <div className="feature-icon"><MonitorPlay size={24} /></div>
+                <h3 className="text-xl font-bold mb-3">Setup & Explanation</h3>
+                <p>We help you run the project on your laptop and explain the code logic for your viva.</p>
+              </div>
+            </TiltWrapper>
           </div>
         </div>
       </section>
@@ -192,22 +214,30 @@ export default function Home() {
               </div>
             </div>
             <div className="md:w-1/2 grid grid-cols-2 gap-4">
-              <div className="p-6 bg-blue-50 rounded-2xl text-center">
-                <Globe className="mx-auto text-blue-500 mb-2" size={32} />
-                <div className="font-bold text-slate-700">Frontend</div>
-              </div>
-              <div className="p-6 bg-green-50 rounded-2xl text-center">
-                <Server className="mx-auto text-green-500 mb-2" size={32} />
-                <div className="font-bold text-slate-700">Backend</div>
-              </div>
-              <div className="p-6 bg-amber-50 rounded-2xl text-center">
-                <Database className="mx-auto text-amber-500 mb-2" size={32} />
-                <div className="font-bold text-slate-700">Database</div>
-              </div>
-              <div className="p-6 bg-purple-50 rounded-2xl text-center">
-                <Code2 className="mx-auto text-purple-500 mb-2" size={32} />
-                <div className="font-bold text-slate-700">Full Stack</div>
-              </div>
+              <TiltWrapper>
+                <div className="p-6 bg-blue-50 rounded-2xl text-center h-full">
+                  <Globe className="mx-auto text-blue-500 mb-2" size={32} />
+                  <div className="font-bold text-slate-700">Frontend</div>
+                </div>
+              </TiltWrapper>
+              <TiltWrapper>
+                <div className="p-6 bg-green-50 rounded-2xl text-center h-full">
+                  <Server className="mx-auto text-green-500 mb-2" size={32} />
+                  <div className="font-bold text-slate-700">Backend</div>
+                </div>
+              </TiltWrapper>
+              <TiltWrapper>
+                <div className="p-6 bg-amber-50 rounded-2xl text-center h-full">
+                  <Database className="mx-auto text-amber-500 mb-2" size={32} />
+                  <div className="font-bold text-slate-700">Database</div>
+                </div>
+              </TiltWrapper>
+              <TiltWrapper>
+                <div className="p-6 bg-purple-50 rounded-2xl text-center h-full">
+                  <Code2 className="mx-auto text-purple-500 mb-2" size={32} />
+                  <div className="font-bold text-slate-700">Full Stack</div>
+                </div>
+              </TiltWrapper>
             </div>
           </div>
         </div>
@@ -235,11 +265,13 @@ export default function Home() {
                 desc: "Post-delivery maintenance services are available to ensure smooth project performance."
               }
             ].map((item, i) => (
-              <div key={i} className="p-6 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 transition">
-                <item.icon className="text-blue-400 mb-4" size={32} />
-                <h3 className="font-bold text-lg mb-2">{item.title}</h3>
-                <p className="text-slate-400 text-sm">{item.desc}</p>
-              </div>
+              <TiltWrapper key={i}>
+                <div className="p-6 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 transition h-full">
+                  <item.icon className="text-blue-400 mb-4" size={32} />
+                  <h3 className="font-bold text-lg mb-2">{item.title}</h3>
+                  <p className="text-slate-400 text-sm">{item.desc}</p>
+                </div>
+              </TiltWrapper>
             ))}
           </div>
         </div>
@@ -260,11 +292,13 @@ export default function Home() {
               { step: "03", title: "Review & Demo", desc: "Check the working demo and request changes." },
               { step: "04", title: "Final Delivery", desc: "Get source code, documents and explanation." }
             ].map((s, i) => (
-              <div key={i} className="relative p-6 border border-slate-100 rounded-lg bg-slate-50 text-center">
-                <div className="text-4xl font-black text-slate-200 absolute top-2 right-4">{s.step}</div>
-                <h3 className="text-lg font-bold mb-2 relative z-10">{s.title}</h3>
-                <p className="text-sm text-slate-500 relative z-10">{s.desc}</p>
-              </div>
+              <FadeUp key={i} delay={i * 0.2}>
+                <div className="relative p-6 border border-slate-100 rounded-lg bg-slate-50 text-center h-full">
+                  <div className="text-4xl font-black text-slate-200 absolute top-2 right-4">{s.step}</div>
+                  <h3 className="text-lg font-bold mb-2 relative z-10">{s.title}</h3>
+                  <p className="text-sm text-slate-500 relative z-10">{s.desc}</p>
+                </div>
+              </FadeUp>
             ))}
           </div>
 

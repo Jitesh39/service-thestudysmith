@@ -6,6 +6,8 @@ import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import TiltWrapper from "@/components/TiltWrapper";
+import { FadeUp } from "@/components/MotionWrappers";
 
 // Project Data - Add new projects here
 const projects = [
@@ -111,52 +113,54 @@ const ProjectCard = ({ project }: { project: typeof projects[0] }) => {
     }[project.theme as "blue" | "emerald" | "violet"] || { gradient: "from-blue-500 to-indigo-600", pill: "bg-blue-50 text-blue-600" };
 
     return (
-        <div className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md border border-slate-100 hover:-translate-y-1 transition-all duration-300 group flex flex-col h-full">
-            <div className="h-36 bg-slate-100 flex items-center justify-center relative overflow-hidden shrink-0 group">
-                {/* Image or Gradient Fallback */}
-                {project.image ? (
-                    <>
-                        <img
-                            src={project.image}
-                            alt={project.title}
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                        <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors duration-300"></div>
-                    </>
-                ) : (
-                    <div className={`absolute inset-0 bg-gradient-to-br ${themeStyles.gradient} opacity-90 group-hover:scale-105 transition-transform duration-500`}></div>
-                )}
+        <TiltWrapper>
+            <div className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md border border-slate-100 transition-all duration-300 group flex flex-col h-full">
+                <div className="h-36 bg-slate-100 flex items-center justify-center relative overflow-hidden shrink-0 group">
+                    {/* Image or Gradient Fallback */}
+                    {project.image ? (
+                        <>
+                            <img
+                                src={project.image}
+                                alt={project.title}
+                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            />
+                            <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors duration-300"></div>
+                        </>
+                    ) : (
+                        <div className={`absolute inset-0 bg-gradient-to-br ${themeStyles.gradient} opacity-90 group-hover:scale-105 transition-transform duration-500`}></div>
+                    )}
 
-                {/* Category Badge overlay on image */}
-                <div className="absolute top-2 right-2">
-                    <span className="px-2 py-1 bg-white/90 backdrop-blur-sm text-slate-700 text-[10px] font-bold rounded-md shadow-sm border border-white/20">
-                        {project.category}
-                    </span>
-                </div>
-            </div>
-
-            <div className="p-4 flex flex-col flex-grow">
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                    {project.technologies.map((tech, i) => (
-                        <span key={i} className={`px-2.5 py-0.5 ${themeStyles.pill} text-[10px] uppercase tracking-wide font-bold rounded-md`}>
-                            {tech}
+                    {/* Category Badge overlay on image */}
+                    <div className="absolute top-2 right-2">
+                        <span className="px-2 py-1 bg-white/90 backdrop-blur-sm text-slate-700 text-[10px] font-bold rounded-md shadow-sm border border-white/20">
+                            {project.category}
                         </span>
-                    ))}
+                    </div>
                 </div>
-                <h3 className="text-lg font-bold text-slate-800 mb-1 leading-snug">{project.title}</h3>
-                <p className="text-slate-500 text-xs mb-4 leading-relaxed flex-grow line-clamp-3">
-                    {project.description}
-                </p>
-                <a
-                    href={project.demoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors shadow-sm mt-auto text-center block"
-                >
-                    View Demo
-                </a>
+
+                <div className="p-4 flex flex-col flex-grow">
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                        {project.technologies.map((tech, i) => (
+                            <span key={i} className={`px-2.5 py-0.5 ${themeStyles.pill} text-[10px] uppercase tracking-wide font-bold rounded-md`}>
+                                {tech}
+                            </span>
+                        ))}
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-800 mb-1 leading-snug">{project.title}</h3>
+                    <p className="text-slate-500 text-xs mb-4 leading-relaxed flex-grow line-clamp-3">
+                        {project.description}
+                    </p>
+                    <a
+                        href={project.demoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors shadow-sm mt-auto text-center block"
+                    >
+                        View Demo
+                    </a>
+                </div>
             </div>
-        </div>
+        </TiltWrapper>
     );
 };
 
@@ -182,21 +186,23 @@ export default function DemoProjectsPage() {
             <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-br from-blue-50 to-transparent -z-10"></div>
 
             <div className="container mx-auto px-6 py-24">
-                <div className="mb-12 mt-4">
-                    <Link
-                        href="/"
-                        className="inline-flex items-center gap-2 text-slate-500 hover:text-blue-600 transition-colors mb-6 font-medium"
-                    >
-                        <ArrowLeft size={18} />
-                        Back to Home
-                    </Link>
-                    <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-4">
-                        Sample <span className="text-blue-600">Static</span> Projects
-                    </h1>
-                    <p className="text-lg text-slate-600 max-w-2xl leading-relaxed">
-                        Explore our collection of projects. These demos showcase the quality, functionality, and documentation standards we deliver.
-                    </p>
-                </div>
+                <FadeUp>
+                    <div className="mb-12 mt-4">
+                        <Link
+                            href="/"
+                            className="inline-flex items-center gap-2 text-slate-500 hover:text-blue-600 transition-colors mb-6 font-medium"
+                        >
+                            <ArrowLeft size={18} />
+                            Back to Home
+                        </Link>
+                        <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-4">
+                            Sample <span className="text-blue-600">Static</span> Projects
+                        </h1>
+                        <p className="text-lg text-slate-600 max-w-2xl leading-relaxed">
+                            Explore our collection of projects. These demos showcase the quality, functionality, and documentation standards we deliver.
+                        </p>
+                    </div>
+                </FadeUp>
 
                 {/* Projects Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 content-start min-h-[600px]">
@@ -248,18 +254,20 @@ export default function DemoProjectsPage() {
                 )}
 
                 {/* Call to Action */}
-                <div className="mt-20 text-center bg-blue-600 rounded-3xl p-12 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
-                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-white opacity-10 rounded-full blur-3xl transform -translate-x-1/2 translate-y-1/2"></div>
+                <FadeUp>
+                    <div className="mt-20 text-center bg-blue-600 rounded-3xl p-12 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
+                        <div className="absolute bottom-0 left-0 w-64 h-64 bg-white opacity-10 rounded-full blur-3xl transform -translate-x-1/2 translate-y-1/2"></div>
 
-                    <h2 className="text-3xl font-bold text-white mb-6 relative z-10">Want a Static Website ?</h2>
-                    <p className="text-blue-100 mb-8 max-w-xl mx-auto relative z-10">
-                        We will create a personalized project based on your specific requirements. Contact us to discuss your project idea.
-                    </p>
-                    <Link href="/#contact" className="inline-block bg-white text-blue-600 font-bold py-3 px-8 rounded-full shadow-lg hover:bg-blue-50 hover:scale-105 transition-all duration-300 relative z-10">
-                        Connect with team
-                    </Link>
-                </div>
+                        <h2 className="text-3xl font-bold text-white mb-6 relative z-10">Want a Static Website ?</h2>
+                        <p className="text-blue-100 mb-8 max-w-xl mx-auto relative z-10">
+                            We will create a personalized project based on your specific requirements. Contact us to discuss your project idea.
+                        </p>
+                        <Link href="/#contact" className="inline-block bg-white text-blue-600 font-bold py-3 px-8 rounded-full shadow-lg hover:bg-blue-50 hover:scale-105 transition-all duration-300 relative z-10">
+                            Connect with team
+                        </Link>
+                    </div>
+                </FadeUp>
             </div>
 
             <Footer className="mt-12" />

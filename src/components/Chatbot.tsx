@@ -67,12 +67,11 @@ export default function Chatbot() {
             } else if (option.action === "talk_expert") {
                 const infoText = `We’d be happy to connect you with our expert team. You can reach us through the following channels:
 
-📞 Call: +91 9508086078
-📧 Email: thestudysmithpu@gmail.com
+             📞 Call: +91 9508086078
+             📧 Email: thestudysmithpu@gmail.com
 
-💬 WhatsApp: Available 24/7
-
-Alternatively, share your details with us, and our team will get back to you within 30 minutes.`;
+             💬 WhatsApp: Available 24/7
+              Alternatively, share your details with us, and our team will get back to you within 30 minutes.`;
 
                 setMessages((prev) => [
                     ...prev,
