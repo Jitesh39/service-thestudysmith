@@ -25,7 +25,7 @@ export default function Chatbot() {
     const [messages, setMessages] = useState<ChatMessage[]>([
         {
             id: 1,
-            text: "Hi there! 👋 Welcome to TheStudySmith.\n\nHow can I assist you today?",
+            text: "Hi there! Welcome to TheStudySmith.\n\nHow can I assist you today?",
             isBot: true,
             type: "text",
             options: [
@@ -65,12 +65,11 @@ export default function Chatbot() {
                     },
                 ]);
             } else if (option.action === "talk_expert") {
-                const infoText = `We’d be happy to connect you with our expert team. You can reach us through the following channels:
+                const infoText = `We would be happy to connect you with our expert team. You can reach us through the following channels:
 
-             📞 Call: +91 9508086078
-             📧 Email: thestudysmithpu@gmail.com
-
-             💬 WhatsApp: Available 24/7
+              Call: +91 9508086078
+              Email: thestudysmithpu@gmail.com
+              WhatsApp: Available 9:00 Am To 5:00 Pm
               Alternatively, share your details with us, and our team will get back to you within 30 minutes.`;
 
                 setMessages((prev) => [
