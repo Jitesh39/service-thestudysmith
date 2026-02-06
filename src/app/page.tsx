@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+// import Image from "next/image";
 import {
   Code2,
   BookOpen,
@@ -218,7 +218,7 @@ export default function Home() {
         <div className="container">
           <div className="text-center mb-16">
             <h2 className="section-title" style={{ color: 'white' }}>Why Choose TheStudySmith?</h2>
-            <p className="section-subtitle text-slate-300">We don't just sell code; we provide a complete solution for your academic success.</p>
+            <p className="section-subtitle text-slate-300">We dont just sell code; we provide a complete solution for your academic success.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -302,7 +302,7 @@ export default function Home() {
             <div className="text-white text-center md:text-left">
               <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Submit Your Project?</h2>
               <p className="text-blue-100 mb-8 text-lg leading-relaxed">
-                Don't let the deadline scare you. Fill out the form or connect with us instantly for a high-quality, university-approved project.
+                Dont let the deadline scare you. Fill out the form or connect with us instantly for a high-quality, university-approved project.
               </p>
 
               <div className="flex flex-col gap-4 max-w-sm mx-auto md:mx-0">
