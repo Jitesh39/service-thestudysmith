@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { MessageSquare, X, Send, Bot, Phone, Mail, ChevronRight, User, FileText, Smartphone } from "lucide-react";
+import { MessageSquare, X, Send, Bot, Mail, ChevronRight, User, FileText, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 

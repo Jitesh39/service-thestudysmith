@@ -24,7 +24,7 @@ import Footer from "@/components/Footer";
 import Newsletter from "@/components/Newsletter";
 import InquiryForm from "@/components/InquiryForm";
 import TiltWrapper from "@/components/TiltWrapper";
-import { FadeUp, FadeIn, ScaleIn } from "@/components/MotionWrappers";
+import { FadeUp, ScaleIn } from "@/components/MotionWrappers";
 
 export default function Home() {
   const faqs = [
