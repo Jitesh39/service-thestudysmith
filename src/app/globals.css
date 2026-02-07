@@ -18,6 +18,8 @@ body {
 }
 
 @layer components {
+
+  /* ... existing component classes ... */
   .accordion-item {
     @apply border border-slate-200 rounded-lg mb-2 overflow-hidden;
   }
@@ -77,4 +79,33 @@ body {
   .hero-section {
     @apply relative py-20 bg-gradient-to-b from-blue-50 to-white;
   }
+}
+
+/* Custom Animation Keyframes */
+@keyframes progress {
+  0% {
+    transform: scaleX(0);
+  }
+
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes run-person {
+  0% {
+    left: 0%;
+  }
+
+  100% {
+    left: 95%;
+  }
+}
+
+.animate-progress {
+  animation: progress 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-run-person {
+  animation: run-person 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }

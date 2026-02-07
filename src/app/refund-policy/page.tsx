@@ -22,7 +22,7 @@ export default function RefundPolicyPage() {
 
                 <div className="bg-white rounded-2xl shadow-xl p-8 md:p-12 border border-slate-100">
                     <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-2">Return & Refund Policy</h1>
-                    <p className="text-blue-600 font-semibold text-lg mb-8">(Student Project Services Only)</p>
+                    <p className="text-blue-600 font-semibold text-lg mb-8">(Applicable to Project Services Only)</p>
 
                     <div className="space-y-8 text-slate-700 leading-relaxed">
 
@@ -30,8 +30,9 @@ export default function RefundPolicyPage() {
                         <section>
                             <h2 className="text-xl font-bold text-slate-900 mb-3">Introduction</h2>
                             <p>
-                                At TheStudySmith, we specialize in providing web development project services exclusively for students. Our goal is to support academic requirements with structured, high-quality project solutions. This policy explains how return, cancellation, and refund requests related to student projects are handled.
-                            </p>
+                                At TheStudySmith, we provide web development project services for our clients.
+                                Our goal is to support client requirements by delivering structured and high-quality project solutions.
+                                This policy explains how return, cancellation, and refund requests related to our project services are handled.</p>
                         </section>
 
                         {/* Eligibility */}
@@ -41,7 +42,7 @@ export default function RefundPolicyPage() {
                             <div className="mb-4">
                                 <h3 className="font-bold text-slate-800 mb-2">1. Project Non-Delivery</h3>
                                 <ul className="list-disc pl-5 space-y-1">
-                                    <li>A refund request may be considered if the student project is not delivered within the agreed timeline due to reasons solely attributable to TheStudySmith.</li>
+                                    <li>A refund request may be considered if the project is not delivered within the agreed timeline due to reasons solely attributable to TheStudySmith. </li>
                                     <li>Such requests must be raised within <strong>7 days</strong> of the committed delivery date.</li>
                                 </ul>
                             </div>
@@ -49,7 +50,7 @@ export default function RefundPolicyPage() {
                             <div className="mb-4">
                                 <h3 className="font-bold text-slate-800 mb-2">2. Deviation from Approved Scope</h3>
                                 <ul className="list-disc pl-5 space-y-1">
-                                    <li>If the delivered project does not match the initially approved project scope or features, students may raise a concern within <strong>14 days</strong> of delivery.</li>
+                                    <li>If the delivered project does not match the initially approved scope or features, the client may raise a concern within <strong>14 days</strong> of delivery.</li>
                                     <li>Clear justification and details must be shared.</li>
                                     <li>TheStudySmith will first attempt to correct or revise the project before any refund is evaluated.</li>
                                 </ul>
@@ -72,12 +73,12 @@ export default function RefundPolicyPage() {
 
                             <p className="mb-2 font-semibold">Please include:</p>
                             <ul className="list-disc pl-5 space-y-1 mb-3">
-                                <li>Student name</li>
+                                <li>Client name</li>
                                 <li>Project title</li>
                                 <li>Order details</li>
                                 <li>Reason for the request</li>
                             </ul>
-                            <p>Our team will review the request and respond within <strong>5–8 working days</strong>.</p>
+                            <p>Our team will review the request and respond within <strong>2-4 working days</strong>.</p>
                         </section>
 
                         {/* Conditions */}
@@ -85,13 +86,13 @@ export default function RefundPolicyPage() {
                             <h2 className="text-xl font-bold text-slate-900 mb-4 border-b pb-2 border-slate-100">Conditions & Limitations</h2>
                             <ul className="list-disc pl-5 space-y-1 mb-4">
                                 <li>Refunds are processed only after internal review and approval.</li>
-                                <li>Approved refunds will be credited to the original payment method within <strong>10–15 business days</strong>.</li>
+                                <li>Approved refunds will be credited to the original payment method within <strong>5-6 business days</strong>.</li>
                             </ul>
                             <p className="font-semibold mb-2">No refunds will be provided for:</p>
                             <ul className="list-disc pl-5 space-y-1">
                                 <li>Projects delivered as per the approved scope</li>
                                 <li>Changes requested after project approval</li>
-                                <li>Student dissatisfaction due to viva performance or evaluation outcome</li>
+                                <li>Client dissatisfaction related to presentation, review, or evaluation outcomes</li>
                             </ul>
                         </section>
 
@@ -108,7 +109,7 @@ export default function RefundPolicyPage() {
                         <section>
                             <h2 className="text-xl font-bold text-slate-900 mb-3">Exceptional Cases</h2>
                             <p>
-                                If a project is affected by unavoidable external factors (such as institutional policy changes or third-party service issues), TheStudySmith will work with the student to provide a reasonable alternative solution where possible.
+                                If a project is affected by unavoidable external factors (such as institutional policy changes or third-party service issues), TheStudySmith will work with the Client to provide a reasonable alternative solution where possible.
                             </p>
                         </section>
 

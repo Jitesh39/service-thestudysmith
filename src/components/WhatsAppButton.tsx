@@ -8,13 +8,13 @@ export default function WhatsAppButton() {
     const pathname = usePathname();
 
     // Don't show on dashboard pages
-    
+
     if (pathname?.startsWith("/dashboard")) {
         return null;
     }
 
     return (
-        <div className="fixed bottom-16 left-8 md:bottom-8 md:left-8 z-50 flex items-center justify-center group">
+        <div className="fixed bottom-24 left-8 md:bottom-16 md:left-9 z-50 flex items-center justify-center group">
             {/* Pulsing Ring Animation */}
             <div className="absolute inset-0 rounded-full bg-green-500 animate-pulse-ring"></div>
 

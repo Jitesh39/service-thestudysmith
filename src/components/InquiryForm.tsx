@@ -103,7 +103,7 @@ export default function InquiryForm() {
                         value={formData.university || ""}
                         onChange={handleChange}
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-slate-900"
-                        placeholder="e.g. IGNOU, LPU"
+                        placeholder="e.g. Amity University, LPU"
                     />
                 </div>
 
@@ -116,7 +116,7 @@ export default function InquiryForm() {
                         value={formData.projectTitle || ""}
                         onChange={handleChange}
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-slate-900"
-                        placeholder="e.g. E-Commerce Website"
+                        placeholder="e.g. Portfolio Website"
                     />
                 </div>
 

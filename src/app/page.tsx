@@ -30,9 +30,9 @@ export default function Home() {
   const faqs = [
     { question: "Do these projects cover web development only?", answer: "Yes, we specialize in Web Development projects using modern stacks like MERN (MongoDB, Express, React, Node.js), Next.js, and PHP/MySQL." },
     { question: "Is the code plagiarism-free?", answer: "Absolutely. Every project is developed from scratch ensuring uniqueness and compliance with university standards." },
-    { question: "Do you provide documentation?", answer: "Yes, all major projects come with complete documentation (Synopsis, SRS, System Design, Testing Reports) as per university guidelines." },
+    { question: "Do you provide documentation?", answer: "Yes, all major projects come with complete documentation as per Our Organisation guidelines." },
     { question: "How long does delivery take?", answer: "Mini projects are delivered within 24-48 hours. Major projects typically take 3-5 days depending on complexity." },
-    { question: "Will you explain the project code?", answer: "Yes! We provide a complete code walkthrough and explanation session so you can confidently present your project to the examiner." }
+    { question: "What is the payment structure?", answer: "We follow a simple payment policy: 50% advance before starting the project and the remaining 50% after project completion." }
   ];
 
   return (
@@ -59,15 +59,14 @@ export default function Home() {
             </h1>
           </FadeUp>
           <FadeUp delay={0.6}>
-            <p className="text-lg md:text-xl text-slate-600 mb-9 max-w-2xl mx-auto leading-relaxed">
-              Secure your degree with university-approved projects by TheStudySmith, including full source code, documentation, and explanation support.
-              <Link href="https://thestudysmith9.wordpress.com/" target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-900 hover:underline"> TheStudySmith</Link>.
+            <p className="text-lg md:text-xl text-slate-600 mb-10 max-w-2xl mx-auto leading-relaxed">
+              Turn your ideas into impactful projects with <Link href="https://thestudysmith9.wordpress.com/" target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-900 hover:text-blue-600">TheStudySmith</Link>, built for performance, precision, and results.
             </p>
           </FadeUp>
           <FadeUp delay={0.8}>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link href="#contact" className="btn btn-primary w-full sm:w-auto justify-center">
-                Get Your Project <ArrowRight size={18} />
+                Get Started<ArrowRight size={18} />
               </Link>
               <Link href="/login" className="btn btn-outline w-full sm:w-auto justify-center">
                 Client Portal
@@ -103,7 +102,7 @@ export default function Home() {
         <div className="container">
           <div className="text-center mb-16">
             <h2 className="section-title">Sample Projects</h2>
-            <p className="section-subtitle">Take a look at some of our recent work.</p>
+            <p className="section-subtitle">Check out our latest projects to understand our quality and work standards.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
@@ -176,22 +175,22 @@ export default function Home() {
             <TiltWrapper>
               <div className="card h-full">
                 <div className="feature-icon"><FileCode size={24} /></div>
-                <h3 className="text-xl font-bold mb-3">Full Source Code</h3>
-                <p>Clean, well-structured, and commented code that is easy to understand and modify.</p>
+                <h3 className="text-xl font-bold mb-3">Complete Project Package</h3>
+                <p>A complete, well-structured project package delivered seamlessly.</p>
               </div>
             </TiltWrapper>
             <TiltWrapper>
               <div className="card h-full">
                 <div className="feature-icon"><BookOpen size={24} /></div>
                 <h3 className="text-xl font-bold mb-3">Complete Documentation</h3>
-                <p>Includes Synopsis, SRS, DFDs, ER Diagrams, and Testing Reports required for submission.</p>
+                <p>Includes SRS, DFDs, ER Diagrams, and Project Reports required for submission.</p>
               </div>
             </TiltWrapper>
             <TiltWrapper>
               <div className="card h-full">
                 <div className="feature-icon"><MonitorPlay size={24} /></div>
-                <h3 className="text-xl font-bold mb-3">Setup & Explanation</h3>
-                <p>We help you run the project on your laptop and explain the code logic for your viva.</p>
+                <h3 className="text-xl font-bold mb-3">Industry-Ready Live Project</h3>
+                <p>Get a live, end-to-end project with complete features, real workflows, and smooth performance.</p>
               </div>
             </TiltWrapper>
           </div>
@@ -246,18 +245,17 @@ export default function Home() {
       {/* Why Choose Us */}
       <section id="why-us" className="section-padding bg-slate-900 text-white">
         <div className="container">
-          <div className="text-center mb-16">
+          <FadeUp className="text-center mb-16">
             <h2 className="section-title" style={{ color: 'white' }}>Why Choose TheStudySmith?</h2>
-            <p className="section-subtitle text-slate-300">We dont just sell code; we provide a complete solution for your academic success.</p>
-          </div>
+            <p className="section-subtitle text-slate-300">We don't just sell code, we provide a complete solution for your academic success.</p>
+          </FadeUp>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[
               { icon: CheckCircle2, title: "Original Projects", desc: "Unique topics and custom-built code to avoid plagiarism issues." },
-
               { icon: Clock, title: "On-Time Delivery", desc: "Never miss a deadline. We deliver faster than anyone else." },
               { icon: CreditCard, title: "Affordable Pricing", desc: "Student-friendly rates without compromising on quality." },
-              { icon: Headphones, title: "Support till Submission", desc: "We are with you until your project is accepted." },
+              { icon: Headphones, title: "End-to-End Project Solution", desc: "From idea to execution, we deliver a complete working project." },
               { icon: Server, title: "Web Project Deployment & Hosting", desc: "Your project will be hosted live for review, submission, and presentation. Hosting charges are to be paid by the customer." },
               {
                 icon: Wrench,
@@ -265,13 +263,15 @@ export default function Home() {
                 desc: "Post-delivery maintenance services are available to ensure smooth project performance."
               }
             ].map((item, i) => (
-              <TiltWrapper key={i}>
-                <div className="p-6 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 transition h-full">
-                  <item.icon className="text-blue-400 mb-4" size={32} />
-                  <h3 className="font-bold text-lg mb-2">{item.title}</h3>
-                  <p className="text-slate-400 text-sm">{item.desc}</p>
-                </div>
-              </TiltWrapper>
+              <FadeUp key={i} delay={i * 0.1} className="h-full">
+                <TiltWrapper className="h-full">
+                  <div className="p-6 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 transition h-full">
+                    <item.icon className="text-blue-400 mb-4" size={32} />
+                    <h3 className="font-bold text-lg mb-2">{item.title}</h3>
+                    <p className="text-slate-400 text-sm">{item.desc}</p>
+                  </div>
+                </TiltWrapper>
+              </FadeUp>
             ))}
           </div>
         </div>
@@ -290,11 +290,11 @@ export default function Home() {
               { step: "01", title: "Select Topic", desc: "Choose from our list or bring your own idea." },
               { step: "02", title: "Development", desc: "Our experts build your project (1-5 Days)." },
               { step: "03", title: "Review & Demo", desc: "Check the working demo and request changes." },
-              { step: "04", title: "Final Delivery", desc: "Get source code, documents and explanation." }
+              { step: "04", title: "Final Delivery", desc: "A smooth handover of the complete working project." }
             ].map((s, i) => (
               <FadeUp key={i} delay={i * 0.2}>
                 <div className="relative p-6 border border-slate-100 rounded-lg bg-slate-50 text-center h-full">
-                  <div className="text-4xl font-black text-slate-200 absolute top-2 right-4">{s.step}</div>
+                  <div className="text-4xl font-black text-slate-400 absolute top-2 left-2">{s.step}</div>
                   <h3 className="text-lg font-bold mb-2 relative z-10">{s.title}</h3>
                   <p className="text-sm text-slate-500 relative z-10">{s.desc}</p>
                 </div>
@@ -336,7 +336,7 @@ export default function Home() {
             <div className="text-white text-center md:text-left">
               <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Submit Your Project?</h2>
               <p className="text-blue-100 mb-8 text-lg leading-relaxed">
-                Dont let the deadline scare you. Fill out the form or connect with us instantly for a high-quality, university-approved project.
+                Don't let the deadline scare you. Fill out the form or connect with us instantly for a high-quality, Web project.
               </p>
 
               <div className="flex flex-col gap-4 max-w-sm mx-auto md:mx-0">
@@ -351,11 +351,12 @@ export default function Home() {
                   <Phone size={18} />
                   <span className="text-sm">Call Now: +91 9508086078</span>
                 </Link>
+                <p className="ml-14 -mt-2 text-sm text-blue-200 opacity-80">
+                  Available 9:00 AM to 5:00 PM
+                </p>
               </div>
 
-              <p className="mt-8 text-sm text-blue-200 opacity-80">
-                Available 24/7 for urgent project requirements.
-              </p>
+
 
               {/* Newsletter */}
               <Newsletter />

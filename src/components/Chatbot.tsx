@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, ReactNode } from "react";
 import { MessageSquare, X, Send, Bot, Mail, ChevronRight, User, FileText, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -13,7 +13,7 @@ type ChatOption = {
 
 type ChatMessage = {
     id: number;
-    text?: string;
+    text?: string | ReactNode;
     isBot: boolean;
     type: "text" | "options" | "form" | "info";
     options?: ChatOption[];
@@ -25,7 +25,7 @@ export default function Chatbot() {
     const [messages, setMessages] = useState<ChatMessage[]>([
         {
             id: 1,
-            text: "Hi there! Welcome to TheStudySmith.\n\nHow can I assist you today?",
+            text: "Hi there! Welcome to TheStudySmith.\nI am StudySmith Assistant 🤖, here to help you with any questions or support you need. How can I assist you today?",
             isBot: true,
             type: "text",
             options: [
@@ -65,12 +65,19 @@ export default function Chatbot() {
                     },
                 ]);
             } else if (option.action === "talk_expert") {
-                const infoText = `We would be happy to connect you with our expert team. You can reach us through the following channels:
-
-              Call: +91 9508086078
-              Email: thestudysmithpu@gmail.com
-              WhatsApp: Available 9:00 Am To 5:00 Pm
-              Alternatively, share your details with us, and our team will get back to you within 30 minutes.`;
+                const infoText = (
+                    <div>
+                        We would be happy to connect you with our expert team. You can reach us through the following channels:
+                        <br /><br />
+                        Call: <a href="tel:+919508086078" className="text-blue-600 font-medium hover:underline">+91 9508086078</a>
+                        <br />
+                        Email: <a href="mailto:thestudysmithpu@gmail.com" className="text-blue-600 font-medium hover:underline">thestudysmithpu@gmail.com</a>
+                        <br />
+                        WhatsApp: Available 9:00 AM To 5:00 PM
+                        <br />
+                        Alternatively, share your details with us, and our team will get back to you within 30 minutes.
+                    </div>
+                );
 
                 setMessages((prev) => [
                     ...prev,
@@ -130,7 +137,7 @@ export default function Chatbot() {
 
             setMessages((prev) => [
                 ...prev,
-                { id: Date.now(), text: "Thank you! With your details received, our team will contact you shortly.", isBot: true, type: "text" },
+                { id: Date.now(), text: "Thank you! your details received, our team will contact you shortly.", isBot: true, type: "text" },
             ]);
 
         } catch (error) {
@@ -173,7 +180,7 @@ export default function Chatbot() {
     return (
         <>
             {/* Toggle Button Wrapper */}
-            <div className={cn("fixed bottom-16 right-8 md:bottom-8 md:right-8 z-50 flex items-center justify-center group", isOpen && "pointer-events-none")}>
+            <div className={cn("fixed bottom-24 right-9 md:bottom-12 md:right-9 z-50 flex items-center justify-center group", isOpen && "pointer-events-none")}>
                 <button
                     suppressHydrationWarning={true}
                     onClick={() => setIsOpen(!isOpen)}
@@ -202,7 +209,7 @@ export default function Chatbot() {
             {/* Chat Window */}
             <div
                 className={cn(
-                    "fixed bottom-24 right-8 z-50 w-[400px] max-w-[calc(100vw-5rem)] bg-white rounded-2xl shadow-2xl border border-slate-100 flex flex-col transition-all duration-300 origin-bottom-right overflow-hidden",
+                    "fixed bottom-32 right-8 z-50 w-[400px] max-w-[calc(100vw-5rem)] bg-white rounded-2xl shadow-2xl border border-slate-100 flex flex-col transition-all duration-300 origin-bottom-right overflow-hidden",
                     isOpen
                         ? "scale-100 opacity-100 translate-y-0"
                         : "scale-90 opacity-0 translate-y-10 pointer-events-none"

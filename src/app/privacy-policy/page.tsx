@@ -30,16 +30,17 @@ export default function PrivacyPolicyPage() {
                         <section>
                             <h2 className="text-xl font-bold text-slate-900 mb-3">Introduction</h2>
                             <p>
-                                Welcome to TheStudySmith. We provide web development project services exclusively for students. Protecting the privacy and security of student information is a priority for us. This Privacy Policy explains how we collect, use, store, and protect personal information shared with us.
-                            </p>
+                                Welcome to TheStudySmith. We provide web development project services for our clients.
+                                Protecting the privacy and security of client information is a priority for us.
+                                This Privacy Policy explains how we collect, use, store, and protect personal information shared with us.                            </p>
                         </section>
 
                         {/* Scope */}
                         <section>
                             <h2 className="text-xl font-bold text-slate-900 mb-3">Scope of This Policy</h2>
                             <p>
-                                This policy applies to all personal data collected through TheStudySmith website, communication channels, and student project-related services. It governs how information is handled during inquiries, project development, delivery, hosting, and maintenance support.
-                            </p>
+                                This policy applies to all personal data collected through the TheStudySmith website, communication channels, and project-related services.
+                                It governs how information is handled during inquiries, project development, delivery, hosting, and maintenance support.                            </p>
                         </section>
 
                         {/* Information We Collect */}
@@ -50,10 +51,10 @@ export default function PrivacyPolicyPage() {
                                 <h3 className="font-bold text-slate-800 mb-2">1. Personal Information</h3>
                                 <p className="mb-2">We may collect the following details:</p>
                                 <ul className="list-disc pl-5 space-y-1">
-                                    <li>Student name</li>
+                                    <li>Client name</li>
                                     <li>Email address</li>
                                     <li>Phone number</li>
-                                    <li>Course, college, and academic requirements (if shared voluntarily)</li>
+                                    <li>Project requirements, organization details, or other relevant information (if shared voluntarily)</li>
                                 </ul>
                             </div>
 
@@ -84,17 +85,17 @@ export default function PrivacyPolicyPage() {
                             <ul className="list-disc pl-5 space-y-1 mb-4">
                                 <li>Providing web development project services</li>
                                 <li>Communicating project updates and support</li>
-                                <li>Improving service quality and student experience</li>
+                                <li>Improving service quality and client experience</li>
                                 <li>Fulfilling legal or institutional requirements</li>
                             </ul>
-                            <p className="font-semibold text-slate-800">We do not sell or misuse student data.</p>
+                            <p className="font-semibold text-slate-800">We do not sell, rent, or misuse client data.</p>
                         </section>
 
                         {/* Information Sharing */}
                         <section>
                             <h2 className="text-xl font-bold text-slate-900 mb-4 border-b pb-2 border-slate-100">Information Sharing & Disclosure</h2>
                             <ul className="list-disc pl-5 space-y-1">
-                                <li>Student information is shared only with authorized team members involved in project delivery.</li>
+                                <li>Client information is shared only with authorized team members involved in project delivery.</li>
                                 <li>Third-party services (such as hosting or analytics) may be used under strict confidentiality agreements.</li>
                                 <li>Information may be disclosed if required by law or legal authorities.</li>
                             </ul>
@@ -104,16 +105,16 @@ export default function PrivacyPolicyPage() {
                         <section>
                             <h2 className="text-xl font-bold text-slate-900 mb-4 border-b pb-2 border-slate-100">Data Security & Retention</h2>
                             <ul className="list-disc pl-5 space-y-1">
-                                <li>We apply reasonable technical and organizational measures to safeguard student data.</li>
+                                <li>We apply reasonable technical and organizational measures to safeguard Client data.</li>
                                 <li>Information is retained only as long as required for project completion, support, or legal obligations.</li>
                                 <li>Once no longer needed, data is securely deleted.</li>
                             </ul>
                         </section>
 
-                        {/* Student Rights */}
+                        {/* Client Rights */}
                         <section>
-                            <h2 className="text-xl font-bold text-slate-900 mb-4 border-b pb-2 border-slate-100">Student Rights</h2>
-                            <p className="mb-3">Students have the right to:</p>
+                            <h2 className="text-xl font-bold text-slate-900 mb-4 border-b pb-2 border-slate-100">Client Rights</h2>
+                            <p className="mb-3">Clients have the right to:</p>
                             <ul className="list-disc pl-5 space-y-1 mb-3">
                                 <li>Access the personal data we hold</li>
                                 <li>Request correction of incorrect information</li>

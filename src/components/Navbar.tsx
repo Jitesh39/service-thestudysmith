@@ -128,7 +128,7 @@ export default function Navbar() {
             )}
         >
             <div className="container flex items-center justify-between h-14 md:h-16">
-                <Link href="/" onClick={scrollToTop} className="flex items-center gap-2 pl-2 md:pl-4">
+                <a href="/" className="flex items-center gap-2 pl-2 md:pl-4">
                     <Image
                         src="/logo1.png"
                         alt="TheStudySmith Logo"
@@ -139,7 +139,7 @@ export default function Navbar() {
                     <span className={cn("font-bold text-xl md:text-2xl tracking-tight transition-colors duration-300", getLogoColor())}>
                         TheStudySmith
                     </span>
-                </Link>
+                </a>
 
                 <div className={cn("hidden md:flex gap-8 text-base font-medium transition-colors duration-300", isDarkSection ? "text-slate-200" : "text-slate-600")}>
                     {navLinks.map((link) => (
