@@ -39,10 +39,10 @@ const projects = [
         demoUrl: "#"
     },
     {
-        title: "Portfolio",
-        category: "Portfolio Website",
-        description: "A fully functional portfolio web.",
-        technologies: ["React", "Node.js"],
+        title: "Gym",
+        category: "Gym Website",
+        description: "A fully functional gym website.",
+        technologies: ["Next.js", "firebase"],
         theme: "blue",
         image: "https://placehold.co/600x400/2563eb/white?text=Portfolio",
         demoUrl: "#"
