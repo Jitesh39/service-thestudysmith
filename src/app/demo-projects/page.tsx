@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import Image from "next/image";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import TiltWrapper from "@/components/TiltWrapper";
@@ -12,95 +12,57 @@ import { FadeUp } from "@/components/MotionWrappers";
 // Project Data - Add new projects here
 const projects = [
     {
-        title: "ShopMaster Pro",
-        category: "E-Commerce Platform",
-        description: "A fully functional e-commerce web application with admin dashboard, payment gateway integration, and order tracking.",
-        technologies: ["React", "Node.js"],
+        title: "Project Owl",
+        // category: "Portfolio Website",
+        description: "A sleek portfolio website designed to showcase a photography business, highlighting work, services, and creative vision professionally.",
+        // technologies: ["React", "Tailwind CSS"],
+        image: "project-demo/project-owl.png",
         theme: "blue",
-        image: "https://placehold.co/600x400/3b82f6/white?text=ShopMaster+Pro",
-        demoUrl: "#"
+        demoUrl: "https://project-owl-one.vercel.app"
     },
     {
-        title: "MediCare System",
-        category: "Hospital Management",
+        title: "ResumeForge AI",
         description: "Comprehensive hospital management system handling patient records, appointments, and doctor scheduling efficiently.",
-        technologies: ["Next.js", "MongoDB"],
-        theme: "emerald",
-        image: "https://placehold.co/600x400/10b981/white?text=MediCare+System",
-        demoUrl: "#"
+        image: "project-demo/resumeforgeai.png",
+        demoUrl: "https://resumeforgeai-pi.vercel.app/"
     },
     {
-        title: "ContentAI",
-        category: "AI Content Generator",
-        description: "SaaS application leveraging AI to generate blog posts, social media captions, and email templates automatically.",
-        technologies: ["OpenAI API", "React"],
-        theme: "violet",
-        image: "https://placehold.co/600x400/8b5cf6/white?text=ContentAI",
-        demoUrl: "#"
+        title: "MyLifeInfo Vault",
+        description: "A secure digital platform to store, organize, and share essential will and emergency information when it matters most.",
+        image: "project-demo/mylifeinfo.png",
+        demoUrl: "https://mylifeinfo-vault.vercel.app/"
     },
     {
-        title: "Gym",
-        category: "Gym Website",
-        description: "A fully functional gym website.",
-        technologies: ["Next.js", "firebase"],
-        theme: "blue",
-        image: "https://placehold.co/600x400/2563eb/white?text=Portfolio",
-        demoUrl: "#"
+        title: "TheStudySmith",
+        description: "TheStudySmith is an all-in-one academic platform for Parul University students, providing organized study materials, notes, question banks, and helpful resources to make learning simpler, faster, and more effective.",
+        image: "project-demo/thestudysmith.png",
+        demoUrl: "https://thestudysmith9.wordpress.com"
     },
     {
-        title: "Portfolio",
-        category: "Portfolio Website",
-        description: "A fully functional portfolio web.",
-        technologies: ["React", "Node.js"],
-        theme: "blue",
-        image: "https://placehold.co/600x400/2563eb/white?text=Portfolio",
-        demoUrl: "#"
+        title: "Personal Portfolio",
+        description: "A personal portfolio website to showcase skills, projects, and professional achievements.",
+        image: "project-demo/portfolio-jitesh.png",
+        demoUrl: "https://jitesh-z.netlify.app"
     },
     {
-        title: "Portfolio",
-        category: "Portfolio Website",
-        description: "A fully functional portfolio web.",
-        technologies: ["React", "Node.js"],
-        theme: "blue",
-        image: "https://placehold.co/600x400/2563eb/white?text=Portfolio",
-        demoUrl: "#"
+        title: "VivaMentor",
+        description: "VivaMentor is a focused learning platform that helps students confidently prepare for project reviews and viva examinations.",
+        image: "project-demo/vivamentor.png",
+        demoUrl: "https://vivamentor.vercel.app/"
     },
     {
-        title: "Portfolio",
-        category: "Portfolio Website",
-        description: "A fully functional portfolio web.",
-        technologies: ["React", "Node.js"],
-        theme: "blue",
-        image: "https://placehold.co/600x400/2563eb/white?text=Portfolio",
-        demoUrl: "#"
+        title: "CivicTrack",
+        description: "A civic issue reporting and tracking platform that helps communities raise, monitor, and resolve local problems transparently.",
+        image: "project-demo/civictrack.png",
+        demoUrl: "https://civictrack-mu.vercel.app/"
     },
     {
-        title: "Portfolio",
-        category: "Portfolio Website",
-        description: "A fully functional portfolio web.",
-        technologies: ["React", "Node.js"],
-        theme: "blue",
-        image: "https://placehold.co/600x400/2563eb/white?text=Portfolio",
-        demoUrl: "#"
-    },
-    {
-        title: "Portfolio",
-        category: "Portfolio Website",
-        description: "A fully functional portfolio web.",
-        technologies: ["React", "Node.js"],
-        theme: "blue",
-        image: "https://placehold.co/600x400/2563eb/white?text=Portfolio",
-        demoUrl: "#"
-    },
-    {
-        title: "Portfolio",
-        category: "Portfolio Website",
-        description: "A fully functional portfolio web.",
-        technologies: ["React", "Node.js"],
-        theme: "blue",
-        image: "https://placehold.co/600x400/2563eb/white?text=Portfolio",
-        demoUrl: "#"
+        title: "Service-TheStudySmith",
+        description: "A service platform by TheStudySmith that helps students get simple, professional static websites quickly and affordably.",
+        image: "project-demo/service-thestudysmith.png",
+        demoUrl: "https://service-thestudysmith.vercel.app/"
     }
+
 ];
 
 // Reusable Project Card Component - Memoized to prevent re-renders (optional but good practice)
@@ -115,7 +77,7 @@ const ProjectCard = ({ project }: { project: typeof projects[0] }) => {
     return (
         <TiltWrapper>
             <div className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md border border-slate-100 transition-all duration-300 group flex flex-col h-full">
-                <div className="h-36 bg-slate-100 flex items-center justify-center relative overflow-hidden shrink-0 group">
+                <div className="h-64 bg-slate-100 flex items-center justify-center relative overflow-hidden shrink-0 group">
                     {/* Image or Gradient Fallback */}
                     {project.image ? (
                         <>
@@ -131,21 +93,21 @@ const ProjectCard = ({ project }: { project: typeof projects[0] }) => {
                     )}
 
                     {/* Category Badge overlay on image */}
-                    <div className="absolute top-2 right-2">
+                    {/* <div className="absolute top-2 right-2">
                         <span className="px-2 py-1 bg-white/90 backdrop-blur-sm text-slate-700 text-[10px] font-bold rounded-md shadow-sm border border-white/20">
                             {project.category}
                         </span>
-                    </div>
+                    </div> */}
                 </div>
 
                 <div className="p-4 flex flex-col flex-grow">
-                    <div className="flex flex-wrap gap-1.5 mb-3">
+                    {/* <div className="flex flex-wrap gap-1.5 mb-3">
                         {project.technologies.map((tech, i) => (
                             <span key={i} className={`px-2.5 py-0.5 ${themeStyles.pill} text-[10px] uppercase tracking-wide font-bold rounded-md`}>
                                 {tech}
                             </span>
                         ))}
-                    </div>
+                    </div> */}
                     <h3 className="text-lg font-bold text-slate-800 mb-1 leading-snug">{project.title}</h3>
                     <p className="text-slate-500 text-xs mb-4 leading-relaxed flex-grow line-clamp-3">
                         {project.description}
@@ -154,7 +116,7 @@ const ProjectCard = ({ project }: { project: typeof projects[0] }) => {
                         href={project.demoUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="w-full py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors shadow-sm mt-auto text-center block"
+                        className="w-full py-3 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors shadow-sm mt-auto text-center block"
                     >
                         View Demo
                     </a>
@@ -252,6 +214,17 @@ export default function DemoProjectsPage() {
                         </button>
                     </div>
                 )}
+
+                {/* View All Demos Button */}
+                <div className="flex justify-center mt-16 mb-4">
+                    <Link
+                        href="/#contact"
+                        className="inline-flex items-center gap-3 px-10 py-4 bg-white text-slate-900 font-bold rounded-2xl shadow-sm border border-slate-200 hover:bg-slate-50 hover:border-blue-200 hover:shadow-md transition-all duration-300 group"
+                    >
+                        <span>For more work samples, reach out to our team</span>
+                        <ArrowRight size={20} className="text-blue-600 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                </div>
 
                 {/* Call to Action */}
                 <FadeUp>

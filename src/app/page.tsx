@@ -109,15 +109,18 @@ export default function Home() {
             {/* Demo Card 1 */}
             <TiltWrapper>
               <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-100 hover:shadow-xl transition-all duration-300 group h-full">
-                <div className="h-48 bg-slate-200 flex items-center justify-center relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-indigo-600 opacity-90 group-hover:scale-105 transition-transform duration-500"></div>
-                  <span className="relative text-white font-bold text-xl">E-Commerce Platform</span>
+                <div className="h-64 bg-slate-200 flex items-center justify-center relative overflow-hidden">
+                  <img
+                    src="project-demo/project-owl.png"
+                    alt="Project Owl"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors duration-300"></div>
                 </div>
                 <div className="p-6">
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">ShopMaster Pro</h3>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">Project Owl</h3>
                   <p className="text-slate-600 text-sm mb-4 leading-relaxed">
-                    A fully functional e-commerce web application with admin dashboard.
-                  </p>
+                    Project Owl is a sleek portfolio website designed to showcase a photography business, highlighting work, services, and creative vision professionally.                  </p>
                 </div>
               </div>
             </TiltWrapper>
@@ -125,15 +128,19 @@ export default function Home() {
             {/* Demo Card 2 */}
             <TiltWrapper>
               <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-100 hover:shadow-xl transition-all duration-300 group h-full">
-                <div className="h-48 bg-slate-200 flex items-center justify-center relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-teal-600 opacity-90 group-hover:scale-105 transition-transform duration-500"></div>
-                  <span className="relative text-white font-bold text-xl">Hospital Management</span>
+                <div className="h-64 bg-slate-200 flex items-center justify-center relative overflow-hidden">
+                  <img
+                    src="project-demo/resumeforgeai.png"
+                    alt="Project Owl"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-transform duration-300"></div>
+                  {/* <span className="relative text-white font-bold text-xl">Hospital Management</span> */}
                 </div>
                 <div className="p-6">
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">MediCare System</h3>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">ResumeForgeAi</h3>
                   <p className="text-slate-600 text-sm mb-4 leading-relaxed">
-                    Comprehensive hospital management system handling patient records.
-                  </p>
+                    A simple platform that offers ready-to-use resume templates to help you build a professional CV quickly and easily.                  </p>
                 </div>
               </div>
             </TiltWrapper>
@@ -141,15 +148,19 @@ export default function Home() {
             {/* Demo Card 3 */}
             <TiltWrapper>
               <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-100 hover:shadow-xl transition-all duration-300 group h-full">
-                <div className="h-48 bg-slate-200 flex items-center justify-center relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-purple-600 opacity-90 group-hover:scale-105 transition-transform duration-500"></div>
-                  <span className="relative text-white font-bold text-xl">AI Content Generator</span>
+                <div className="h-64 bg-slate-200 flex items-center justify-center relative overflow-hidden">
+                  <img
+                    src="project-demo/mylifeinfo.png"
+                    alt="Project Owl"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-transform duration-300"></div>
+                  {/* <span className="relative text-white font-bold text-xl">AI Content Generator</span> */}
                 </div>
                 <div className="p-6">
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">ContentAI</h3>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">MyLifeInfo - Vault</h3>
                   <p className="text-slate-600 text-sm mb-4 leading-relaxed">
-                    SaaS application leveraging AI to generate blog posts automatically.
-                  </p>
+                    A secure digital platform to store, organize, and share essential will and emergency information when it matters most.</p>
                 </div>
               </div>
             </TiltWrapper>
