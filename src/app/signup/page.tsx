@@ -93,7 +93,7 @@ export default function SignupPage() {
             await signOut(auth);
 
             // Redirect to login with a message
-            alert("Account created successfully! Please check your email to verify your account before logging in.");
+            alert("Account created successfully! Please check your email ( Spam Folder ) to verify your account before logging in.");
             router.push("/login");
 
         } catch (err: any) {
