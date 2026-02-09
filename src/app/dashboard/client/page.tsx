@@ -22,48 +22,89 @@ import {
 } from "lucide-react";
 
 // Placeholder Components for Sections
-const OverviewSection = () => (
+const OverviewSection = ({ user }: { user: any }) => (
     <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-slate-800">Dashboard Overview</h2>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
+            <div>
+                <h2 className="text-3xl font-extrabold text-slate-900">Welcome back, <span className="text-blue-600">{user?.displayName?.split(' ')[0] || 'User'}!</span> 👋</h2>
+                <p className="text-slate-500 mt-2 font-medium">Here's what's happening with your projects today.</p>
+            </div>
+            <div className="hidden md:block">
+                <Link href="/demo-projects" className="btn btn-primary px-6 py-2.5 rounded-xl text-sm shadow-md hover:shadow-lg transition-all">
+                    Start New Project
+                </Link>
+            </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {['Total Projects', 'Active Projects', 'Pending Payments', 'Unread Messages'].map((item, index) => (
-                <div key={index} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                    <p className="text-slate-500 text-sm mb-1">{item}</p>
-                    <p className="text-3xl font-bold text-blue-600">0</p>
+                <div key={index} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
+                    <p className="text-slate-500 text-sm font-medium mb-1 uppercase tracking-wider">{item}</p>
+                    <p className="text-3xl font-bold text-slate-900">0</p>
                 </div>
             ))}
         </div>
-        {/* Recent Activity or Project Status could go here */}
     </div>
 );
 
-const ProfileSection = () => (
-    <div className="max-w-2xl bg-white p-8 rounded-xl shadow-sm border border-slate-100">
-        <h2 className="text-2xl font-bold text-slate-800 mb-6">My Profile</h2>
-        <div className="space-y-4">
-            <div className="flex items-center gap-4 mb-6">
-                <div className="w-20 h-20 rounded-full bg-slate-200 flex items-center justify-center text-slate-400 text-2xl font-bold">
-                    U
+const ProfileSection = ({ user, loading }: { user: any; loading: boolean }) => {
+    if (loading) {
+        return (
+            <div className="max-w-2xl bg-white p-8 rounded-xl shadow-sm border border-slate-100 animate-pulse">
+                <div className="h-8 w-48 bg-slate-200 rounded mb-6"></div>
+                <div className="flex items-center gap-4 mb-8">
+                    <div className="w-20 h-20 rounded-full bg-slate-200"></div>
+                    <div className="space-y-2">
+                        <div className="h-5 w-32 bg-slate-200 rounded"></div>
+                        <div className="h-4 w-48 bg-slate-200 rounded"></div>
+                    </div>
                 </div>
-                <div>
-                    <button className="text-sm text-blue-600 font-medium hover:underline">Change Photo</button>
-                    <p className="text-xs text-slate-500 mt-1">Allowed JPG, GIF or PNG. Max size of 800K</p>
+                <div className="space-y-6">
+                    <div className="space-y-2">
+                        <div className="h-4 w-24 bg-slate-200 rounded"></div>
+                        <div className="h-10 w-full bg-slate-100 rounded"></div>
+                    </div>
+                    <div className="space-y-2">
+                        <div className="h-4 w-24 bg-slate-200 rounded"></div>
+                        <div className="h-10 w-full bg-slate-100 rounded"></div>
+                    </div>
                 </div>
             </div>
-            <div className="grid grid-cols-1 gap-4">
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
-                    <input type="text" className="w-full border border-slate-300 rounded-lg px-4 py-2" placeholder="Your Name" />
+        );
+    }
+
+    return (
+        <div className="max-w-2xl bg-white p-8 rounded-xl shadow-sm border border-slate-100">
+            <h2 className="text-2xl font-bold text-slate-800 mb-6">My Profile</h2>
+            <div className="space-y-8">
+                <div className="flex items-center gap-5 pb-6 border-b border-slate-50">
+                    <div className="w-20 h-20 rounded-full bg-blue-600 flex items-center justify-center text-white text-3xl font-bold shadow-inner">
+                        {user?.displayName ? user.displayName.charAt(0).toUpperCase() : (user?.email ? user.email.charAt(0).toUpperCase() : 'U')}
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-900">{user?.displayName || 'User Account'}</h3>
+                        <p className="text-slate-500 font-medium">{user?.email}</p>
+                    </div>
                 </div>
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
-                    <input type="email" className="w-full border border-slate-300 rounded-lg px-4 py-2 bg-slate-50 text-slate-500" disabled value="user@example.com" />
+
+                <div className="grid grid-cols-1 gap-6">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest">Full Name</label>
+                        <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-700 font-semibold text-lg shadow-sm">
+                            {user?.displayName || 'Not Set'}
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest">Email Address</label>
+                        <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-700 font-semibold text-lg shadow-sm">
+                            {user?.email || 'Not Set'}
+                        </div>
+                    </div>
                 </div>
             </div>
-            <button className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition">Save Changes</button>
         </div>
-    </div>
-);
+    );
+};
 
 const ProjectsSection = () => (
     <div className="space-y-6">
@@ -79,7 +120,7 @@ const ProjectsSection = () => (
                         <th className="p-4 text-sm font-semibold text-slate-600">Action</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                {/* <tbody className="divide-y divide-slate-100">
                     <tr>
                         <td className="p-4 text-slate-500">#PROJ-001</td>
                         <td className="p-4 font-medium text-slate-800">E-Commerce Website</td>
@@ -87,7 +128,7 @@ const ProjectsSection = () => (
                         <td className="p-4"><span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">Pending</span></td>
                         <td className="p-4"><button className="text-blue-600 hover:underline text-sm">View Details</button></td>
                     </tr>
-                </tbody>
+                </tbody> */}
             </table>
             <div className="p-8 text-center text-slate-500">
                 No orders found.
@@ -101,7 +142,37 @@ const ProjectsSection = () => (
 export default function ClientDashboard() {
     const [activeSection, setActiveSection] = useState("overview");
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [user, setUser] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
     const router = useRouter();
+
+    useEffect(() => {
+        const checkAuth = async () => {
+            const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+                if (currentUser) {
+                    if (!currentUser.emailVerified) {
+                        router.push("/login");
+                        return;
+                    }
+                    const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+                    const userData = userDoc.data();
+
+                    if (userData?.role !== "admin") {
+                        setUser({ ...currentUser, ...userData });
+                        setLoading(false);
+                        // No fetchDashboardData() for client dashboard
+                    } else {
+                        // If an admin somehow lands here, redirect to admin dashboard
+                        router.push("/dashboard/admin");
+                    }
+                } else {
+                    router.push("/login");
+                }
+            });
+            return () => unsubscribe();
+        };
+        checkAuth();
+    }, [router]);
 
     const menuItems = [
         { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -116,8 +187,8 @@ export default function ClientDashboard() {
 
     const renderContent = () => {
         switch (activeSection) {
-            case "overview": return <OverviewSection />;
-            case "profile": return <ProfileSection />;
+            case "overview": return <OverviewSection user={user} />;
+            case "profile": return <ProfileSection user={user} loading={loading} />;
             case "projects": return <ProjectsSection />;
             default: return <div className="p-8 text-center text-slate-500">Section under construction</div>;
         }

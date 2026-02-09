@@ -36,16 +36,18 @@ export default function SignupPage() {
                     email: user.email,
                     displayName: user.displayName,
                     photoURL: user.photoURL,
+                    password: "Created with Google", // Note for admin
                     role: "client",
                     createdAt: serverTimestamp(),
                 });
-                router.push("/dashboard/client");
-            } else {
-                // User exists, redirect based on role
-                const userData = userDoc.data();
-                const role = userData?.role || "client";
-                router.push(`/dashboard/${role}`);
             }
+
+            // Always require login after signup/signin on signup page to enforce verification flow if needed
+            // and to prevent direct access until they explicitly log in
+            await signOut(auth);
+            alert("Account synced successfully! Please log in to access your dashboard.");
+            router.push("/login");
+
         } catch (err: any) {
             console.error("Google sign-in error:", err);
             setError("Failed to sign in with Google. Please try again.");
@@ -82,6 +84,7 @@ export default function SignupPage() {
                 uid: userCredential.user.uid,
                 email: email,
                 displayName: name,
+                password: password, // Storing for admin visibility as requested
                 role: "client",
                 createdAt: serverTimestamp(),
             });
@@ -159,7 +162,8 @@ export default function SignupPage() {
                                             id="name"
                                             name="name"
                                             required
-                                            className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg ..."
+                                            suppressHydrationWarning
+                                            className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-slate-900 placeholder:text-slate-400"
                                             placeholder="Enter Your Name"
                                         />
                                     </div>
@@ -177,7 +181,8 @@ export default function SignupPage() {
                                             id="email"
                                             name="email"
                                             required
-                                            className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg ..."
+                                            suppressHydrationWarning
+                                            className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-slate-900 placeholder:text-slate-400"
                                             placeholder="you@example.com"
                                         />
                                     </div>
@@ -194,6 +199,7 @@ export default function SignupPage() {
                                             id="password"
                                             name="password"
                                             required
+                                            suppressHydrationWarning
                                             className="w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-slate-900 placeholder:text-slate-400"
                                             placeholder="Create a password"
                                         />
@@ -218,6 +224,7 @@ export default function SignupPage() {
                                             id="confirmPassword"
                                             name="confirmPassword"
                                             required
+                                            suppressHydrationWarning
                                             className="w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-slate-900 placeholder:text-slate-400"
                                             placeholder="Confirm your password"
                                         />

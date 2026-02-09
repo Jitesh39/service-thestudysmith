@@ -15,8 +15,12 @@ export default function DashboardLayout({
     const router = useRouter();
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (!user) {
+                router.push("/login");
+            } else if (!user.emailVerified) {
+                // If user is logged in but email is not verified, force sign out and redirect
+                await auth.signOut();
                 router.push("/login");
             } else {
                 setLoading(false);
