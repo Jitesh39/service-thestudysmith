@@ -216,6 +216,10 @@ const AdminProjects = ({ sheetUrl, onUpdateUrl }: { sheetUrl: string, onUpdateUr
                         <div className="mt-0.5 text-blue-600 font-bold text-lg">i</div>
                         <p className="text-xs text-slate-600 leading-relaxed font-medium">
                             To get your link: Open your Google Sheet → Go to <span className="font-bold">File</span> → <span className="font-bold">Share</span> → <span className="font-bold">Publish to web</span> → Select <span className="font-bold">Embed</span> and copy the URL within the <code className="bg-slate-100 px-1 rounded">src="..."</code> attribute.
+                            <br /><br />
+                            <span className="text-blue-700 font-bold">Important:</span> Your sheet MUST include columns for <span className="font-bold">"Project ID"</span> and <span className="font-bold">"Email Address"</span> for the client portal.
+                            <br />
+                            <span className="font-bold">Recommended Column Names:</span> Project ID, Email Address, Project Name, Enquire Date, Project Status, Payment, Payment Status.
                         </p>
                     </div>
                 </div>
@@ -383,7 +387,20 @@ const UsersSection = ({ users, totalUsers, onDelete, currentUserEmail }: { users
 };
 
 export default function AdminDashboard() {
-    const [activeSection, setActiveSection] = useState("overview");
+    const [activeSection, setActiveSection] = useState<string>("");
+
+    // Persist active section on refresh
+    useEffect(() => {
+        const savedSection = localStorage.getItem("adminActiveSection");
+        setActiveSection(savedSection || "overview");
+    }, []);
+
+    useEffect(() => {
+        if (activeSection) {
+            localStorage.setItem("adminActiveSection", activeSection);
+        }
+    }, [activeSection]);
+
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [totalUsers, setTotalUsers] = useState(0);
     const [allUsers, setAllUsers] = useState<any[]>([]);
