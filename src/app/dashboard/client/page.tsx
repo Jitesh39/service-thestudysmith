@@ -182,7 +182,7 @@ export default function ClientDashboard() {
         { id: "documents", label: "Documents", icon: FileText },
         { id: "support", label: "Support", icon: MessageSquare },
         { id: "notifications", label: "Notifications", icon: Bell },
-        { id: "settings", label: "Settings", icon: Settings },
+        // { id: "settings", label: "Settings", icon: Settings },
     ];
 
     const renderContent = () => {

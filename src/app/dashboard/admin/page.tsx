@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
 import Link from "next/link";
 import {
     LayoutDashboard,
@@ -19,7 +19,8 @@ import {
     User,
     Eye,
     EyeOff,
-    Trash2
+    Trash2,
+    RefreshCw
 } from "lucide-react";
 
 const AdminOverview = ({ user, totalUsers }: { user: any; totalUsers: number }) => (
@@ -112,17 +113,156 @@ const ProfileSection = ({ user, loading }: { user: any; loading: boolean }) => {
     );
 };
 
-const AdminProjects = () => (
-    <div className="space-y-6">
-        <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold text-slate-800">Manage Projects</h2>
-            <button className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">Add New Project</button>
+const AdminProjects = ({ sheetUrl, onUpdateUrl }: { sheetUrl: string, onUpdateUrl: (url: string) => void }) => {
+    const [tempUrl, setTempUrl] = useState(sheetUrl);
+    const [isEditing, setIsEditing] = useState(false);
+    const [refreshKey, setRefreshKey] = useState(Date.now());
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    const [lastSynced, setLastSynced] = useState<string | null>(null);
+
+    // Sync tempUrl with sheetUrl when it changes externally
+    useEffect(() => {
+        setTempUrl(sheetUrl);
+    }, [sheetUrl]);
+
+    const handleRefresh = () => {
+        setIsRefreshing(true);
+        setRefreshKey(Date.now());
+        setLastSynced(new Date().toLocaleTimeString());
+        setTimeout(() => setIsRefreshing(false), 800);
+    };
+
+    // Construct the final URL with a cache-busting parameter, handling hashes correctly
+    const getFinalUrl = (url: string) => {
+        if (!url) return "";
+        try {
+            // Split by hash to ensure query params come before the fragment
+            const [base, hash] = url.split("#");
+            const separator = base.includes("?") ? "&" : "?";
+            return `${base}${separator}nocache=${refreshKey}${hash ? "#" + hash : ""}`;
+        } catch (e) {
+            return url;
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <div>
+                    <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Project Tracker</h2>
+                    <p className="text-slate-500 text-sm font-medium">Real-time collaboration via Google Sheets</p>
+                </div>
+                <div className="flex items-center gap-4">
+                    {lastSynced && !isEditing && (
+                        <div className="hidden md:flex flex-col items-end">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Last Sync</span>
+                            <span className="text-xs font-semibold text-blue-600">{lastSynced}</span>
+                        </div>
+                    )}
+                    <div className="flex gap-3">
+                        {sheetUrl && (
+                            <button
+                                onClick={handleRefresh}
+                                className={`p-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-blue-600 hover:border-blue-200 shadow-sm transition-all active:scale-95 ${isRefreshing ? "bg-blue-50" : ""}`}
+                                title="Sync Sheet Now"
+                            >
+                                <RefreshCw size={18} className={isRefreshing ? "animate-spin" : ""} />
+                            </button>
+                        )}
+                        <button
+                            onClick={() => setIsEditing(!isEditing)}
+                            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center gap-2 border ${isEditing
+                                ? "bg-slate-100 border-slate-200 text-slate-700"
+                                : "bg-white border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-600 shadow-sm"
+                                }`}
+                        >
+                            <Settings size={16} className={isEditing ? "animate-spin-slow" : ""} />
+                            {isEditing ? "Cancel" : "Config Sheet"}
+                        </button>
+                        <button className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center gap-2">
+                            <Briefcase size={16} />
+                            Add Project
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {isEditing && (
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 p-6 rounded-2xl animate-in fade-in slide-in-from-top-4 duration-300 shadow-sm">
+                    <div className="flex items-center gap-2 mb-3 text-blue-800">
+                        <Settings size={18} />
+                        <label className="text-sm font-bold uppercase tracking-wider">Spreadsheet Configuration</label>
+                    </div>
+                    <div className="flex flex-col md:flex-row gap-3">
+                        <input
+                            type="text"
+                            value={tempUrl}
+                            onChange={(e) => setTempUrl(e.target.value)}
+                            placeholder="Paste Google Sheet 'Publish to web' URL here..."
+                            className="flex-1 bg-white border border-blue-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner"
+                        />
+                        <button
+                            onClick={() => {
+                                onUpdateUrl(tempUrl);
+                                setIsEditing(false);
+                            }}
+                            className="bg-blue-600 text-white px-8 py-3 rounded-xl text-sm font-bold hover:bg-blue-700 shadow-md shadow-blue-200 transition-all active:scale-95"
+                        >
+                            Save Changes
+                        </button>
+                    </div>
+                    <div className="mt-4 flex items-start gap-3 bg-white/50 p-3 rounded-lg border border-white/80">
+                        <div className="mt-0.5 text-blue-600 font-bold text-lg">i</div>
+                        <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                            To get your link: Open your Google Sheet → Go to <span className="font-bold">File</span> → <span className="font-bold">Share</span> → <span className="font-bold">Publish to web</span> → Select <span className="font-bold">Embed</span> and copy the URL within the <code className="bg-slate-100 px-1 rounded">src="..."</code> attribute.
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden h-[700px] relative group border-t-4 border-t-blue-500">
+                {sheetUrl ? (
+                    <div className="w-full h-full relative">
+                        {isRefreshing && (
+                            <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center animate-in fade-in duration-300">
+                                <div className="flex flex-col items-center gap-3">
+                                    <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
+                                    <p className="text-blue-600 font-bold text-sm">Syncing Data...</p>
+                                </div>
+                            </div>
+                        )}
+                        <iframe
+                            key={refreshKey}
+                            src={getFinalUrl(sheetUrl)}
+                            className="w-full h-full border-0"
+                            allowFullScreen
+                            loading="lazy"
+                            title="Active Projects Sheet"
+                        />
+                    </div>
+                ) : (
+                    <div className="h-full flex flex-col items-center justify-center p-12 text-center bg-slate-50/30">
+                        <div className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-slate-100 animate-bounce-subtle">
+                            <Briefcase className="text-blue-500" size={40} />
+                        </div>
+                        <h3 className="text-2xl font-black text-slate-800 mb-3 tracking-tight">Streamline Your Workflow</h3>
+                        <p className="max-w-md text-slate-500 text-lg mb-8 font-medium">
+                            Connect your Google Sheet project tracker to see all active projects, deadlines, and milestones directly in your admin dashboard.
+                        </p>
+                        <button
+                            onClick={() => setIsEditing(true)}
+                            className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-xl active:scale-95 flex items-center gap-2"
+                        >
+                            Connect Project Sheet
+                            <Settings size={18} />
+                        </button>
+                    </div>
+                )}
+            </div>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-8 text-center text-slate-500">
-            No projects found.
-        </div>
-    </div>
-);
+    );
+};
 
 const UsersSection = ({ users, totalUsers, onDelete, currentUserEmail }: { users: any[], totalUsers: number, onDelete: (uid: string) => void, currentUserEmail?: string }) => {
     const isSuperAdmin = currentUserEmail === 'thestudysmithpu@gmail.com';
@@ -248,24 +388,15 @@ export default function AdminDashboard() {
     const [totalUsers, setTotalUsers] = useState(0);
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [user, setUser] = useState<any>(null);
+    const [sheetUrl, setSheetUrl] = useState("");
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
     useEffect(() => {
-        const fetchDashboardData = async () => {
-            try {
-                // Fetch all users to get real-time signup count and details
-                const usersSnapshot = await getDocs(collection(db, "users"));
-                const usersList = usersSnapshot.docs.map(doc => doc.data());
-                setAllUsers(usersList);
-                setTotalUsers(usersSnapshot.size);
-            } catch (error) {
-                console.error("Error fetching dashboard data:", error);
-            }
-        };
+        let unsubscribeSettings: (() => void) | undefined;
 
         const checkAuth = async () => {
-            auth.onAuthStateChanged(async (currentUser) => {
+            const unsubscribeAuth = auth.onAuthStateChanged(async (currentUser) => {
                 if (currentUser) {
                     if (!currentUser.emailVerified) {
                         router.push("/login");
@@ -279,15 +410,38 @@ export default function AdminDashboard() {
                     } else {
                         setUser({ ...currentUser, ...userData });
                         setLoading(false);
-                        fetchDashboardData();
+
+                        // Fetch real-time settings (including Google Sheet URL)
+                        unsubscribeSettings = onSnapshot(doc(db, "settings", "dashboard"), (settingsDoc) => {
+                            if (settingsDoc.exists()) {
+                                setSheetUrl(settingsDoc.data().sheetUrl || "");
+                            }
+                        });
+
+                        // Fetch other dashboard data once
+                        try {
+                            const usersSnapshot = await getDocs(collection(db, "users"));
+                            const usersList = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id }));
+                            setAllUsers(usersList);
+                            setTotalUsers(usersSnapshot.size);
+                        } catch (error) {
+                            console.error("Error fetching dashboard data:", error);
+                        }
                     }
                 } else {
                     router.push("/login");
                 }
             });
+
+            return unsubscribeAuth;
         };
 
-        checkAuth();
+        const authCleanupPromise = checkAuth();
+
+        return () => {
+            authCleanupPromise.then(cleanup => cleanup && cleanup());
+            if (unsubscribeSettings) unsubscribeSettings();
+        };
     }, [router]);
 
     const menuItems = [
@@ -314,13 +468,27 @@ export default function AdminDashboard() {
         }
     };
 
+    const handleUpdateSheetUrl = async (url: string) => {
+        try {
+            await setDoc(doc(db, "settings", "dashboard"), {
+                sheetUrl: url,
+                updatedAt: new Date()
+            }, { merge: true });
+            setSheetUrl(url);
+            alert("Project sheet configuration updated successfully!");
+        } catch (error) {
+            console.error("Error updating sheet URL:", error);
+            alert("Failed to update sheet configuration.");
+        }
+    };
+
     const renderContent = () => {
         if (loading && activeSection === "profile") return <ProfileSection user={null} loading={true} />;
 
         switch (activeSection) {
             case "overview": return <AdminOverview user={user} totalUsers={totalUsers} />;
             case "profile": return <ProfileSection user={user} loading={loading} />;
-            case "projects": return <AdminProjects />;
+            case "projects": return <AdminProjects sheetUrl={sheetUrl} onUpdateUrl={handleUpdateSheetUrl} />;
             case "users": return <UsersSection users={allUsers} totalUsers={totalUsers} onDelete={handleDeleteUser} currentUserEmail={user?.email} />;
             default: return <div className="p-8 text-center text-slate-500">Section under construction</div>;
         }
