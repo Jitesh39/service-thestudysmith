@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs, deleteDoc, setDoc, onSnapshot, collectionGroup, query, orderBy } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, deleteDoc, setDoc, onSnapshot, collectionGroup, query, orderBy, where } from "firebase/firestore";
 import Link from "next/link";
 import {
     LayoutDashboard,
@@ -153,7 +153,12 @@ const AdminSupportSection = () => {
                                         <td className="p-4">
                                             <div className="space-y-1">
                                                 <p className="font-mono text-xs font-bold text-blue-600">{ticket.ticketId || "N/A"}</p>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase truncate max-w-[150px]">{ticket.userEmail}</p>
+                                                <p className="text-[10px] font-bold text-slate-700 capitalize tracking-wide">
+                                                    {(ticket.userName || "Unknown User").toLowerCase()}
+                                                </p>
+                                                <p className="text-[10px] text-slate-400 font-medium lowercase truncate max-w-[150px]">
+                                                    {ticket.userEmail}
+                                                </p>
                                             </div>
                                         </td>
                                         <td className="p-4">
@@ -210,7 +215,12 @@ const AdminSupportSection = () => {
                             <div className="flex justify-between items-start">
                                 <div className="space-y-1">
                                     <p className="font-mono text-xs font-black text-blue-600">{ticket.ticketId || "N/A"}</p>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{ticket.userEmail}</p>
+                                    <p className="text-[10px] font-bold text-slate-700 capitalize tracking-wider">
+                                        {(ticket.userName || "Unknown User").toLowerCase()}
+                                    </p>
+                                    <p className="text-[10px] font-medium text-slate-400 lowercase tracking-wider">
+                                        {ticket.userEmail}
+                                    </p>
                                 </div>
                                 <select
                                     value={ticket.status}
@@ -935,8 +945,9 @@ export default function AdminDashboard() {
                             setTeamMembers(teamList);
                         });
 
-                        // Fetch real-time ticket count
-                        unsubscribeTickets = onSnapshot(collection(db, "tickets"), (snapshot) => {
+                        // Fetch real-time active (open) ticket count
+                        const openTicketsQuery = query(collection(db, "tickets"), where("status", "==", "open"));
+                        unsubscribeTickets = onSnapshot(openTicketsQuery, (snapshot) => {
                             setTotalTickets(snapshot.size);
                         });
 
