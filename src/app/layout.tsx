@@ -29,15 +29,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
+      <body className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
         <Script
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2773187784082106"
           crossOrigin="anonymous"
           strategy="afterInteractive"
         />
-      </head>
-      <body className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
         {children}
         <ScrollToTop />
         <WhatsAppButton />
