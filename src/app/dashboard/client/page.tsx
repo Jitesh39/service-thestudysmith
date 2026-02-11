@@ -132,6 +132,7 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
     const [projectIdInput, setProjectIdInput] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [lastSynced, setLastSynced] = useState<string | null>(null);
 
     const handleSyncData = async (silent = false) => {
         if (!user?.uid || projects.length === 0) return;
@@ -198,6 +199,7 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
                     }, { merge: true });
                 }
             }
+            setLastSynced(new Date().toLocaleTimeString());
             if (!silent) alert("Project data synced with admin sheet!");
         } catch (err) {
             console.error("Sync error:", err);
@@ -305,57 +307,66 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <h2 className="text-2xl font-bold text-slate-800">My Projects</h2>
-                <div className="flex gap-3">
-                    <button
-                        onClick={() => handleSyncData()}
-                        disabled={isSubmitting || projects.length === 0}
-                        className="flex items-center gap-2 bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-200 px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-all active:scale-95 disabled:opacity-50"
-                    >
-                        <RefreshCw size={18} className={isSubmitting ? "animate-spin" : ""} />
-                        Refresh Data
-                    </button>
-                    <button
-                        onClick={() => setIsAdding(true)}
-                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-blue-200 transition-all active:scale-95"
-                    >
-                        <Plus size={18} />
-                        Add Project by ID
-                    </button>
+                <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 w-full sm:w-auto">
+                    {lastSynced && (
+                        <div className="flex flex-col items-start sm:items-end">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Last Sync</span>
+                            <span className="text-xs font-semibold text-blue-600">{lastSynced}</span>
+                        </div>
+                    )}
+                    <div className="flex gap-2 sm:gap-3 items-center">
+                        <button
+                            onClick={() => handleSyncData()}
+                            disabled={isSubmitting || projects.length === 0}
+                            className={`p-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-blue-600 hover:border-blue-200 shadow-sm transition-all active:scale-95 ${isSubmitting ? "bg-blue-50" : ""}`}
+                            title="Refresh Data"
+                        >
+                            <RefreshCw size={18} className={isSubmitting ? "animate-spin" : ""} />
+                        </button>
+                        <button
+                            onClick={() => setIsAdding(true)}
+                            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 whitespace-nowrap"
+                        >
+                            <Plus size={18} className="shrink-0" />
+                            <span className="hidden xs:inline">Add Project</span>
+                            <span className="xs:hidden">Add</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
             {isAdding && (
-                <div className="bg-white p-6 rounded-2xl border-2 border-blue-100 shadow-xl animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="bg-white p-5 md:p-6 rounded-2xl border-2 border-blue-100 shadow-xl animate-in fade-in slide-in-from-top-4 duration-300">
                     <form onSubmit={handleAddProject} className="space-y-4">
                         <div className="flex flex-col gap-2">
                             <label className="text-sm font-bold text-slate-700">Enter Project ID</label>
                             <p className="text-xs text-slate-500 mb-2">Check your confirmation email for the Project ID.</p>
-                            <div className="flex gap-3">
+                            <div className="flex flex-col sm:flex-row gap-3">
                                 <input
                                     type="text"
                                     value={projectIdInput}
                                     onChange={(e) => setProjectIdInput(e.target.value)}
-                                    placeholder="e.g. PROJ-123456"
-                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                                    placeholder="For example :- TSS-1001"
+                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono shadow-inner"
                                     required
                                 />
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                                    className="bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 shadow-md shadow-blue-100"
                                 >
                                     {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
                                     Match & Add
                                 </button>
                             </div>
                         </div>
-                        {error && <p className="text-red-500 text-xs font-semibold">{error}</p>}
+                        {error && <p className="text-red-500 text-xs font-semibold bg-red-50 p-2 rounded-lg">{error}</p>}
                         <button
                             type="button"
                             onClick={() => { setIsAdding(false); setError(null); }}
-                            className="text-slate-400 hover:text-slate-600 text-xs font-medium"
+                            className="text-slate-400 hover:text-slate-600 text-xs font-bold uppercase tracking-wider px-1"
                         >
                             Cancel
                         </button>
@@ -388,7 +399,18 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
                                         <td className="p-4">
                                             <p className="font-semibold text-slate-800">{proj.projectName || proj.title}</p>
                                         </td>
-                                        <td className="p-4 text-slate-500 text-sm text-center">{proj.enquireDate || proj.date}</td>
+                                        <td className="p-4 text-slate-500 text-sm text-center">
+                                            {(() => {
+                                                const dateStr = proj.enquireDate || proj.date;
+                                                if (!dateStr) return 'N/A';
+                                                const d = new Date(dateStr);
+                                                return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('en-GB', {
+                                                    day: 'numeric',
+                                                    month: 'long',
+                                                    year: 'numeric'
+                                                });
+                                            })()}
+                                        </td>
                                         <td className="p-4 text-center">
                                             <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${(proj.projectStatus || proj.status)?.toLowerCase() === 'completed' ? 'bg-green-100 text-green-700' :
                                                 (proj.projectStatus || proj.status)?.toLowerCase() === 'active' ? 'bg-blue-100 text-blue-700' :
