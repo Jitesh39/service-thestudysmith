@@ -20,10 +20,27 @@ import {
     Eye,
     EyeOff,
     Trash2,
-    RefreshCw
+    RefreshCw,
+    Plus,
+    UserPlus,
+    Calendar,
+    Mail,
+    Briefcase as BriefcaseIcon
 } from "lucide-react";
 
-const AdminOverview = ({ user, totalUsers }: { user: any; totalUsers: number }) => (
+const AdminOverview = ({
+    user,
+    totalUsers,
+    teamMembers,
+    onAddMember,
+    onDeleteMember
+}: {
+    user: any;
+    totalUsers: number;
+    teamMembers: any[];
+    onAddMember: (member: any) => void;
+    onDeleteMember: (id: string) => void;
+}) => (
     <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
             <div>
@@ -50,8 +67,251 @@ const AdminOverview = ({ user, totalUsers }: { user: any; totalUsers: number }) 
                 <p className="text-3xl font-bold text-purple-600">0</p>
             </div>
         </div>
+
+        <TeamSection
+            teamMembers={teamMembers}
+            onAddMember={onAddMember}
+            onDeleteMember={onDeleteMember}
+        />
     </div>
 );
+
+const TeamSection = ({ teamMembers, onAddMember, onDeleteMember }: { teamMembers: any[], onAddMember: (member: any) => void, onDeleteMember: (id: string) => void }) => {
+    const [isAdding, setIsAdding] = useState(false);
+    const [newMember, setNewMember] = useState({
+        name: "",
+        email: "",
+        designation: "",
+        joinedDate: new Date().toISOString().split('T')[0],
+        pic: ""
+    });
+
+    const [isUploading, setIsUploading] = useState(false);
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+            const res = await fetch("/api/upload-team-member", {
+                method: "POST",
+                body: formData,
+            });
+            const data = await res.json();
+            if (data.success) {
+                setNewMember({ ...newMember, pic: data.url });
+            } else {
+                alert("Upload failed: " + data.error);
+            }
+        } catch (error) {
+            console.error("Upload error:", error);
+            alert("Upload failed");
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onAddMember(newMember);
+        setNewMember({
+            name: "",
+            email: "",
+            designation: "",
+            joinedDate: new Date().toISOString().split('T')[0],
+            pic: ""
+        });
+        setIsAdding(false);
+    };
+
+    return (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mt-8">
+            <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                <div>
+                    <h2 className="text-xl font-bold text-slate-800">Our Team</h2>
+                    <p className="text-sm text-slate-500 font-medium">Manage your team members and their roles</p>
+                </div>
+                <button
+                    onClick={() => setIsAdding(!isAdding)}
+                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-md shadow-blue-100 active:scale-95"
+                >
+                    {isAdding ? <X size={18} /> : <Plus size={18} />}
+                    {isAdding ? "Cancel" : "Add Member"}
+                </button>
+            </div>
+
+            {isAdding && (
+                <div className="p-6 bg-blue-50/30 border-b border-blue-50 animate-in slide-in-from-top duration-300">
+                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Full Name</label>
+                            <input
+                                required
+                                type="text"
+                                placeholder="Enter Your Name"
+                                value={newMember.name}
+                                onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Email Address</label>
+                            <input
+                                required
+                                type="email"
+                                placeholder="abc@thestudysmith.com"
+                                value={newMember.email}
+                                onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Designation</label>
+                            <input
+                                required
+                                type="text"
+                                placeholder="Senior Web Developer"
+                                value={newMember.designation}
+                                onChange={(e) => setNewMember({ ...newMember, designation: e.target.value })}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Joined Date</label>
+                            <input
+                                required
+                                type="date"
+                                value={newMember.joinedDate}
+                                onChange={(e) => setNewMember({ ...newMember, joinedDate: e.target.value })}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Profile Photo</label>
+                            <div className="relative group">
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleFileUpload}
+                                    className="hidden"
+                                    id="team-member-pic"
+                                />
+                                <label
+                                    htmlFor="team-member-pic"
+                                    className={`flex items-center justify-center gap-2 w-full bg-white border border-dashed border-slate-300 rounded-xl px-4 py-2.5 text-sm cursor-pointer hover:border-blue-500 hover:text-blue-600 transition-all ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                                >
+                                    {isUploading ? (
+                                        <RefreshCw size={16} className="animate-spin" />
+                                    ) : (
+                                        <Plus size={16} />
+                                    )}
+                                    {newMember.pic ? "Change Photo" : "Upload Photo"}
+                                </label>
+                                {newMember.pic && (
+                                    <div className="mt-2 text-[10px] text-green-600 font-bold flex items-center gap-1">
+                                        ✓ Uploaded: {newMember.pic.split('/').pop()}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex items-end">
+                            <button
+                                type="submit"
+                                disabled={isUploading}
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-[0.98] disabled:opacity-50"
+                            >
+                                Save Member
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                    <thead className="bg-slate-50 border-b border-slate-100">
+                        <tr>
+                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Team Member</th>
+                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Email</th>
+                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Designation</th>
+                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Joined Date</th>
+                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-widest text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                        {teamMembers.length > 0 ? (
+                            teamMembers.map((member) => (
+                                <tr key={member.id} className="hover:bg-slate-50 transition-colors group">
+                                    <td className="p-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-blue-100 overflow-hidden border-2 border-white shadow-sm flex-shrink-0">
+                                                {member.pic ? (
+                                                    <img src={member.pic} alt={member.name} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-blue-600 font-bold text-sm bg-blue-50">
+                                                        {member.name.charAt(0)}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-slate-700 leading-none">{member.name}</p>
+                                                <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-tight">{member.designation}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="p-4">
+                                        <div className="flex items-center gap-2 text-slate-600 text-sm font-medium">
+                                            <Mail size={14} className="text-slate-300" />
+                                            {member.email}
+                                        </div>
+                                    </td>
+                                    <td className="p-4">
+                                        <div className="flex items-center gap-2">
+                                            <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                                                {member.designation}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td className="p-4">
+                                        <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
+                                            <Calendar size={14} className="text-slate-300" />
+                                            {new Date(member.joinedDate).toLocaleDateString()}
+                                        </div>
+                                    </td>
+                                    <td className="p-4 text-right">
+                                        <button
+                                            onClick={() => {
+                                                if (confirm("Remove this team member?")) onDeleteMember(member.id);
+                                            }}
+                                            className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
+                        ) : (
+                            <tr>
+                                <td colSpan={5} className="p-12 text-center">
+                                    <div className="flex flex-col items-center gap-3">
+                                        <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-200">
+                                            <UserPlus size={32} />
+                                        </div>
+                                        <p className="text-slate-400 font-medium">No team members added yet.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
 
 const ProfileSection = ({ user, loading }: { user: any; loading: boolean }) => {
     if (loading) {
@@ -404,6 +664,7 @@ export default function AdminDashboard() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [totalUsers, setTotalUsers] = useState(0);
     const [allUsers, setAllUsers] = useState<any[]>([]);
+    const [teamMembers, setTeamMembers] = useState<any[]>([]);
     const [user, setUser] = useState<any>(null);
     const [sheetUrl, setSheetUrl] = useState("");
     const [loading, setLoading] = useState(true);
@@ -411,6 +672,7 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         let unsubscribeSettings: (() => void) | undefined;
+        let unsubscribeTeam: (() => void) | undefined;
 
         const checkAuth = async () => {
             const unsubscribeAuth = auth.onAuthStateChanged(async (currentUser) => {
@@ -433,6 +695,12 @@ export default function AdminDashboard() {
                             if (settingsDoc.exists()) {
                                 setSheetUrl(settingsDoc.data().sheetUrl || "");
                             }
+                        });
+
+                        // Fetch real-time team members
+                        unsubscribeTeam = onSnapshot(collection(db, "team"), (snapshot) => {
+                            const teamList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                            setTeamMembers(teamList);
                         });
 
                         // Fetch other dashboard data once
@@ -458,6 +726,7 @@ export default function AdminDashboard() {
         return () => {
             authCleanupPromise.then(cleanup => cleanup && cleanup());
             if (unsubscribeSettings) unsubscribeSettings();
+            if (unsubscribeTeam) unsubscribeTeam();
         };
     }, [router]);
 
@@ -468,8 +737,33 @@ export default function AdminDashboard() {
         { id: "users", label: "Users", icon: Users },
         { id: "payments", label: "Payments", icon: CreditCard },
         { id: "messages", label: "Messages", icon: MessageSquare },
+        { id: "team", label: "Team", icon: UserPlus },
         { id: "settings", label: "Settings", icon: Settings },
     ];
+
+    const handleAddTeamMember = async (member: any) => {
+        try {
+            const teamRef = collection(db, "team");
+            await setDoc(doc(teamRef), {
+                ...member,
+                createdAt: new Date()
+            });
+            alert("Team member added successfully!");
+        } catch (error) {
+            console.error("Error adding team member:", error);
+            alert("Failed to add team member.");
+        }
+    };
+
+    const handleDeleteTeamMember = async (id: string) => {
+        try {
+            await deleteDoc(doc(db, "team", id));
+            alert("Team member removed successfully!");
+        } catch (error) {
+            console.error("Error deleting team member:", error);
+            alert("Failed to remove team member.");
+        }
+    };
 
     const handleDeleteUser = async (uid: string) => {
         try {
@@ -503,10 +797,28 @@ export default function AdminDashboard() {
         if (loading && activeSection === "profile") return <ProfileSection user={null} loading={true} />;
 
         switch (activeSection) {
-            case "overview": return <AdminOverview user={user} totalUsers={totalUsers} />;
+            case "overview": return (
+                <AdminOverview
+                    user={user}
+                    totalUsers={totalUsers}
+                    teamMembers={teamMembers}
+                    onAddMember={handleAddTeamMember}
+                    onDeleteMember={handleDeleteTeamMember}
+                />
+            );
             case "profile": return <ProfileSection user={user} loading={loading} />;
             case "projects": return <AdminProjects sheetUrl={sheetUrl} onUpdateUrl={handleUpdateSheetUrl} />;
             case "users": return <UsersSection users={allUsers} totalUsers={totalUsers} onDelete={handleDeleteUser} currentUserEmail={user?.email} />;
+            case "team": return (
+                <div className="space-y-6">
+                    <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Team Management</h2>
+                    <TeamSection
+                        teamMembers={teamMembers}
+                        onAddMember={handleAddTeamMember}
+                        onDeleteMember={handleDeleteTeamMember}
+                    />
+                </div>
+            );
             default: return <div className="p-8 text-center text-slate-500">Section under construction</div>;
         }
     };
