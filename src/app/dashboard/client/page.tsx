@@ -47,7 +47,7 @@ const OverviewSection = ({ user, projects }: { user: any; projects: any[] }) => 
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
                 <div>
-                    <h2 className="text-3xl font-extrabold text-slate-900">{getTimeGreeting()} <span className="text-blue-600">{user?.displayName?.split(' ')[0] || 'User'}</span>👋</h2>
+                    <h2 className="text-3xl font-extrabold text-slate-900">{getTimeGreeting()} <span className="text-blue-600">{user?.displayName || 'User'}</span>👋</h2>
                     <p className="text-bold-400 mt-2 font-medium">Welcome Back to your Client Dashboard.</p>
                     <p className="text-bold-600 mt-2 font-medium italic">To track project updates and payments, use the sidebar menu items.</p>
                 </div>

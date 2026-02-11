@@ -57,7 +57,7 @@ const AdminOverview = ({
     <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
             <div>
-                <h2 className="text-3xl font-extrabold text-slate-900">{getTimeGreeting()} <span className="text-blue-600">{user?.displayName?.split(' ')[0] || 'Admin'}!</span> 👋</h2>
+                <h2 className="text-3xl font-extrabold text-slate-900">{getTimeGreeting()} <span className="text-blue-600">{user?.displayName || 'Admin'}</span> 👋</h2>
                 <p className="text-slate-500 mt-2 font-medium">System performance and user engagement overview.</p>
             </div>
         </div>
