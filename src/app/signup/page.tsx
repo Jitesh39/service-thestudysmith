@@ -62,7 +62,7 @@ export default function SignupPage() {
 
         const formData = new FormData(e.currentTarget);
         const name = formData.get("name") as string;
-        const email = formData.get("email") as string;
+        const email = (formData.get("email") as string).trim().toLowerCase();
         const password = formData.get("password") as string;
         const confirmPassword = formData.get("confirmPassword") as string;
 

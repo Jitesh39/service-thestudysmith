@@ -40,8 +40,10 @@ export default function LoginPage() {
                     createdAt: serverTimestamp(),
                 });
                 router.push("/dashboard/client");
-            } else {
-                // User exists, redirect based on role
+                // Reset dashboard view to overview on fresh login
+                localStorage.removeItem("clientActiveSection");
+                localStorage.removeItem("adminActiveSection");
+
                 const userData = userDoc.data();
                 const role = userData?.role || "client";
                 router.push(`/dashboard/${role}`);
@@ -59,7 +61,7 @@ export default function LoginPage() {
         setError("");
 
         const formData = new FormData(e.currentTarget);
-        const email = formData.get("email") as string;
+        const email = (formData.get("email") as string).trim().toLowerCase();
         const password = formData.get("password") as string;
 
         if (!email || !password) {
@@ -96,22 +98,27 @@ export default function LoginPage() {
                 });
             }
 
+            // Reset dashboard view to overview on fresh login
+            localStorage.removeItem("clientActiveSection");
+            localStorage.removeItem("adminActiveSection");
+
             router.push(`/dashboard/${role}`);
 
         } catch (err: any) {
             console.error("Login error:", err);
 
-            let errorMessage = "Failed to sign in. Please check your credentials.";
-            if (err.code === "auth/invalid-credential") {
-                errorMessage = "Invalid email or password.";
-            } else if (err.code === "auth/user-not-found") {
-                errorMessage = "No account found with this email.";
-            } else if (err.code === "auth/wrong-password") {
-                errorMessage = "Incorrect password.";
+            let errorMessage = "Failed to sign in. Please check your connection.";
+
+            if (err.code === "auth/invalid-credential" || err.code === "auth/user-not-found" || err.code === "auth/wrong-password") {
+                errorMessage = "Incorrect email address or password.";
             } else if (err.code === "auth/too-many-requests") {
-                errorMessage = "Too many failed attempts. Please try again later.";
+                errorMessage = "Access temporarily disabled due to too many failed attempts. Reset your password or try again later.";
+            } else if (err.code === "auth/invalid-email") {
+                errorMessage = "The email address format is invalid.";
+            } else if (err.code === "auth/user-disabled") {
+                errorMessage = "This account has been disabled. Please contact support.";
             } else if (err.code === "auth/popup-closed-by-user") {
-                errorMessage = "Sign-in popup was closed.";
+                errorMessage = "Sign-in was cancelled.";
             }
 
             setError(errorMessage);

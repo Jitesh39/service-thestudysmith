@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, onSnapshot, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, onSnapshot, setDoc, addDoc, serverTimestamp, orderBy, runTransaction, increment, limit, getDocs } from "firebase/firestore";
 import Link from "next/link";
 import {
     LayoutDashboard,
@@ -22,8 +22,17 @@ import {
     Plus,
     Search,
     Loader2,
-    RefreshCw
+    RefreshCw,
+    Send
 } from "lucide-react";
+
+// Helper to get time-based greeting
+const getTimeGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning!";
+    if (hour < 17) return "Good Afternoon!";
+    return "Good Evening!";
+};
 
 // Placeholder Components for Sections
 const OverviewSection = ({ user, projects }: { user: any; projects: any[] }) => {
@@ -38,8 +47,8 @@ const OverviewSection = ({ user, projects }: { user: any; projects: any[] }) => 
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
                 <div>
-                    <h2 className="text-3xl font-extrabold text-slate-900">Hello, <span className="text-blue-600">{user?.displayName?.split(' ')[0] || 'User'}!</span>👋</h2>
-                    <p className="text-bold-400 mt-2 font-medium">Welcome to your Client Dashboard.</p>
+                    <h2 className="text-3xl font-extrabold text-slate-900">{getTimeGreeting()} <span className="text-blue-600">{user?.displayName?.split(' ')[0] || 'User'}</span>👋</h2>
+                    <p className="text-bold-400 mt-2 font-medium">Welcome Back to your Client Dashboard.</p>
                     <p className="text-bold-600 mt-2 font-medium italic">To track project updates and payments, use the sidebar menu items.</p>
                 </div>
             </div>
@@ -642,6 +651,213 @@ const DocumentsSection = () => {
     );
 };
 
+const SupportSection = ({ user }: { user: any }) => {
+    const [isRaising, setIsRaising] = useState(false);
+    const [subject, setSubject] = useState("");
+    const [message, setMessage] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [tickets, setTickets] = useState<any[]>([]);
+    const [error, setError] = useState<string | null>(null);
+
+    // Fetch user's tickets based on Email ID
+    useEffect(() => {
+        if (!user?.email) return;
+
+        // Removed orderBy to ensure it works without manual index creation
+        const q = query(
+            collection(db, "tickets"),
+            where("userEmail", "==", user.email)
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const ticketList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+            // Sort manually by date (newest first)
+            ticketList.sort((a, b) => {
+                const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
+                const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
+                return dateB - dateA;
+            });
+            setTickets(ticketList);
+        });
+        return () => unsubscribe();
+    }, [user?.email]);
+
+    const handleRaiseTicket = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!subject.trim() || !message.trim()) return;
+        setIsSubmitting(true);
+        setError(null);
+
+        try {
+            await runTransaction(db, async (transaction) => {
+                // Get or initialize the ticket counter
+                const counterRef = doc(db, "settings", "support_counter");
+                const counterSnap = await transaction.get(counterRef);
+
+                let nextNumber = 1000;
+                if (counterSnap.exists()) {
+                    nextNumber = (counterSnap.data().lastNumber || 999) + 1;
+                }
+
+                const customTicketId = `TSS-SUPPORT-${nextNumber}`;
+                const newTicketRef = doc(collection(db, "tickets"));
+
+                // Set the ticket data
+                transaction.set(newTicketRef, {
+                    ticketId: customTicketId,
+                    userId: user.uid,
+                    userEmail: user.email,
+                    userName: user.displayName || "Unknown User",
+                    subject: subject.trim(),
+                    message: message.trim(),
+                    status: "open",
+                    priority: "normal",
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                });
+
+                // Update the counter
+                transaction.set(counterRef, { lastNumber: nextNumber }, { merge: true });
+            });
+
+            setSubject("");
+            setMessage("");
+            setIsRaising(false);
+        } catch (err: any) {
+            setError("Failed to raise ticket. Please try again.");
+            console.error("Support Error:", err);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
+                <div>
+                    <h2 className="text-3xl font-extrabold text-slate-900">Support <span className="text-blue-600">Center</span></h2>
+                    <p className="text-slate-500 mt-2 font-medium italic">Facing issues? Our expert team is here to assist you as soon as possible.</p>
+                </div>
+                <button
+                    onClick={() => setIsRaising(!isRaising)}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white font-bold text-sm rounded-xl shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95"
+                >
+                    {isRaising ? <X size={18} /> : <Plus size={18} />}
+                    {isRaising ? "Cancel" : "Raise New Ticket"}
+                </button>
+            </div>
+
+            {isRaising && (
+                <div className="bg-white p-8 rounded-2xl shadow-xl border border-blue-100 animate-in zoom-in-95 duration-200">
+                    <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                        <MessageSquare className="text-blue-600" size={24} />
+                        Submit a Support Request
+                    </h3>
+                    <form onSubmit={handleRaiseTicket} className="space-y-4">
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Topic / Subject</label>
+                            <input
+                                type="text"
+                                value={subject}
+                                onChange={(e) => setSubject(e.target.value)}
+                                placeholder="Briefly describe the issue"
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-semibold"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Message Details</label>
+                            <textarea
+                                value={message}
+                                onChange={(e) => setMessage(e.target.value)}
+                                placeholder="Describe your problem in detail..."
+                                rows={5}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-medium"
+                                required
+                            />
+                        </div>
+                        <div className="flex justify-end pt-2">
+                            <button
+                                type="submit"
+                                disabled={isSubmitting || !subject.trim() || !message.trim()}
+                                className="px-8 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg"
+                            >
+                                {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
+                                Send Request
+                            </button>
+                        </div>
+                    </form>
+                    {error && (
+                        <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm font-bold flex items-center gap-2 border border-red-100 animate-in shake-in duration-300">
+                            <X size={16} />
+                            {error}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-white">
+                    <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                        <MessageSquare size={20} className="text-blue-600" />
+                        Ticket History
+                    </h3>
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1 rounded-full">
+                        {tickets.length} Total Tickets
+                    </span>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50/50 border-b border-slate-50">
+                            <tr>
+                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Ticket ID</th>
+                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Subject</th>
+                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Message</th>
+                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Status</th>
+                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Created At</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {tickets.length > 0 ? (
+                                tickets.map((ticket, idx) => (
+                                    <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
+                                        <td className="p-4 font-mono text-xs font-bold text-blue-600">{ticket.ticketId || "N/A"}</td>
+                                        <td className="p-4">
+                                            <p className="font-semibold text-slate-800">{ticket.subject}</p>
+                                        </td>
+                                        <td className="p-4">
+                                            <p className="text-xs text-slate-500 max-w-[200px] truncate font-medium italic">{ticket.message}</p>
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${ticket.status === 'open' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-700'
+                                                }`}>
+                                                {ticket.status}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-center text-slate-500 text-xs font-medium">
+                                            {ticket.createdAt?.toDate().toLocaleDateString('en-GB')}
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={5} className="p-12 text-center">
+                                        <div className="flex flex-col items-center gap-3">
+                                            <MessageSquare className="text-slate-200" size={48} />
+                                            <p className="text-slate-400 font-medium text-lg">No tickets found.</p>
+                                            <p className="text-slate-400 text-sm max-w-xs mx-auto">If you have any questions or issues, raise a ticket using the button above.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export default function ClientDashboard() {
     const [activeSection, setActiveSection] = useState<string>("");
 
@@ -716,6 +932,7 @@ export default function ClientDashboard() {
             case "projects": return <ProjectsSection user={user} loading={loading} projects={projects} />;
             case "payments": return <PaymentsSection projects={projects} />;
             case "documents": return <DocumentsSection />;
+            case "support": return <SupportSection user={user} />;
             case "notifications": return <NotificationsSection />;
             default: return <div className="p-8 text-center text-slate-500">Section under construction</div>;
         }
@@ -739,7 +956,10 @@ export default function ClientDashboard() {
                         </button>
                     ))}
                     <button
-                        onClick={() => signOut(auth)}
+                        onClick={async () => {
+                            localStorage.removeItem("clientActiveSection");
+                            await signOut(auth);
+                        }}
                         className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors mt-auto"
                     >
                         <LogOut size={20} />

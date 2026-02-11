@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs, deleteDoc, setDoc, onSnapshot, collectionGroup } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, deleteDoc, setDoc, onSnapshot, collectionGroup, query, orderBy } from "firebase/firestore";
 import Link from "next/link";
 import {
     LayoutDashboard,
@@ -28,11 +28,19 @@ import {
     Briefcase as BriefcaseIcon
 } from "lucide-react";
 
+const getTimeGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning!";
+    if (hour < 17) return "Good Afternoon!";
+    return "Good Evening!";
+};
+
 const AdminOverview = ({
     user,
     totalUsers,
     activeProjects,
     pendingPayments,
+    totalTickets,
     teamMembers,
     onAddMember,
     onDeleteMember
@@ -41,6 +49,7 @@ const AdminOverview = ({
     totalUsers: number;
     activeProjects: number;
     pendingPayments: number;
+    totalTickets: number;
     teamMembers: any[];
     onAddMember: (member: any) => void;
     onDeleteMember: (id: string) => void;
@@ -48,7 +57,7 @@ const AdminOverview = ({
     <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
             <div>
-                <h2 className="text-3xl font-extrabold text-slate-900">Welcome back, <span className="text-blue-600">{user?.displayName?.split(' ')[0] || 'Admin'}!</span> 👋</h2>
+                <h2 className="text-3xl font-extrabold text-slate-900">{getTimeGreeting()} <span className="text-blue-600">{user?.displayName?.split(' ')[0] || 'Admin'}!</span> 👋</h2>
                 <p className="text-slate-500 mt-2 font-medium">System performance and user engagement overview.</p>
             </div>
         </div>
@@ -68,7 +77,7 @@ const AdminOverview = ({
             </div>
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
                 <p className="text-slate-500 text-sm font-medium mb-1 uppercase tracking-wider">Support Tickets</p>
-                <p className="text-3xl font-bold text-purple-600">0</p>
+                <p className="text-3xl font-bold text-purple-600">{totalTickets}</p>
             </div>
         </div>
 
@@ -79,6 +88,169 @@ const AdminOverview = ({
         />
     </div>
 );
+
+const AdminSupportSection = () => {
+    const [tickets, setTickets] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const q = query(
+            collection(db, "tickets"),
+            orderBy("createdAt", "desc")
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot: any) => {
+            const ticketList = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+            setTickets(ticketList);
+            setLoading(false);
+        }, (error: any) => {
+            console.error("Support Fetch Error:", error);
+            // Fallback without orderBy if index is missing
+            const fallbackQ = query(collection(db, "tickets"));
+            onSnapshot(fallbackQ, (snapshot: any) => {
+                const ticketList = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as any));
+                ticketList.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                setTickets(ticketList);
+                setLoading(false);
+            });
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    const updateTicketStatus = async (id: string, newStatus: string) => {
+        try {
+            await setDoc(doc(db, "tickets", id), { status: newStatus }, { merge: true });
+        } catch (error) {
+            console.error("Status update error:", error);
+        }
+    };
+
+    return (
+        <div className="space-y-6 pb-10">
+            <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
+                <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900">Support <span className="text-blue-600">Ticket Management</span></h2>
+                <p className="text-slate-500 mt-2 font-medium italic">Monitor and resolve help requests from your clients effectively.</p>
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden lg:block bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50 border-b border-slate-100">
+                            <tr>
+                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">ID / User</th>
+                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Subject</th>
+                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Message</th>
+                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
+                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Date</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {tickets.length > 0 ? (
+                                tickets.map((ticket: any) => (
+                                    <tr key={ticket.id} className="hover:bg-slate-50/50 transition-colors group">
+                                        <td className="p-4">
+                                            <div className="space-y-1">
+                                                <p className="font-mono text-xs font-bold text-blue-600">{ticket.ticketId || "N/A"}</p>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase truncate max-w-[150px]">{ticket.userEmail}</p>
+                                            </div>
+                                        </td>
+                                        <td className="p-4">
+                                            <p className="font-bold text-slate-700 text-sm">{ticket.subject}</p>
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="group relative">
+                                                <p className="text-xs text-slate-500 max-w-[250px] line-clamp-2 font-medium italic">"{ticket.message}"</p>
+                                                <div className="hidden group-hover:block absolute z-20 top-full left-0 bg-white border border-slate-200 p-4 rounded-xl text-xs mt-2 w-72 shadow-2xl text-slate-600 font-medium leading-relaxed animate-in fade-in zoom-in-95">
+                                                    <div className="font-black text-[10px] uppercase tracking-widest text-slate-400 mb-2 border-b pb-1">Full Message</div>
+                                                    {ticket.message}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <select
+                                                value={ticket.status}
+                                                onChange={(e) => updateTicketStatus(ticket.id, e.target.value)}
+                                                className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest cursor-pointer focus:outline-none ring-1 ring-inset ${ticket.status === 'open' ? 'bg-green-50 text-green-700 ring-green-100' :
+                                                    ticket.status === 'resolved' ? 'bg-blue-50 text-blue-700 ring-blue-100' :
+                                                        'bg-slate-50 text-slate-500 ring-slate-100'
+                                                    }`}
+                                            >
+                                                <option value="open">Open</option>
+                                                <option value="resolved">Resolved</option>
+                                                <option value="closed">Closed</option>
+                                            </select>
+                                        </td>
+                                        <td className="p-4 text-center text-slate-400 text-[10px] font-black uppercase tracking-widest">
+                                            {ticket.createdAt?.toDate?.()?.toLocaleDateString('en-GB') || "N/A"}
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={5} className="p-20 text-center">
+                                        <div className="flex flex-col items-center gap-3">
+                                            <MessageSquare className="text-slate-200" size={48} />
+                                            <p className="text-slate-400 font-bold text-lg">{loading ? "Fetching Tickets..." : "No support tickets found."}</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* Mobile & Tablet Card View */}
+            <div className="lg:hidden space-y-4">
+                {tickets.length > 0 ? (
+                    tickets.map((ticket: any) => (
+                        <div key={ticket.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+                            <div className="flex justify-between items-start">
+                                <div className="space-y-1">
+                                    <p className="font-mono text-xs font-black text-blue-600">{ticket.ticketId || "N/A"}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{ticket.userEmail}</p>
+                                </div>
+                                <select
+                                    value={ticket.status}
+                                    onChange={(e) => updateTicketStatus(ticket.id, e.target.value)}
+                                    className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest focus:outline-none ${ticket.status === 'open' ? 'bg-green-100 text-green-700' :
+                                        ticket.status === 'resolved' ? 'bg-blue-100 text-blue-700' :
+                                            'bg-slate-100 text-slate-600'
+                                        }`}
+                                >
+                                    <option value="open">Open</option>
+                                    <option value="resolved">Resolved</option>
+                                    <option value="closed">Closed</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <h4 className="font-bold text-slate-800 leading-tight">{ticket.subject}</h4>
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                    <p className="text-xs text-slate-500 font-medium leading-relaxed italic">"{ticket.message}"</p>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-between items-center pt-2 border-t border-slate-50">
+                                <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Raised On</span>
+                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                    {ticket.createdAt?.toDate?.()?.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) || "N/A"}
+                                </span>
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-200 text-center">
+                        <MessageSquare className="mx-auto text-slate-200 mb-3" size={40} />
+                        <p className="text-slate-400 font-bold">{loading ? "Fetching Tickets..." : "No support tickets found."}</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 const TeamSection = ({ teamMembers, onAddMember, onDeleteMember }: { teamMembers: any[], onAddMember: (member: any) => void, onDeleteMember: (id: string) => void }) => {
     const [isAdding, setIsAdding] = useState(false);
@@ -721,6 +893,7 @@ export default function AdminDashboard() {
     const [totalUsers, setTotalUsers] = useState(0);
     const [activeProjects, setActiveProjects] = useState(0);
     const [pendingPayments, setPendingPayments] = useState(0);
+    const [totalTickets, setTotalTickets] = useState(0);
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
     const [user, setUser] = useState<any>(null);
@@ -731,6 +904,7 @@ export default function AdminDashboard() {
     useEffect(() => {
         let unsubscribeSettings: (() => void) | undefined;
         let unsubscribeTeam: (() => void) | undefined;
+        let unsubscribeTickets: (() => void) | undefined;
 
         const checkAuth = async () => {
             const unsubscribeAuth = auth.onAuthStateChanged(async (currentUser) => {
@@ -759,6 +933,11 @@ export default function AdminDashboard() {
                         unsubscribeTeam = onSnapshot(collection(db, "team"), (snapshot) => {
                             const teamList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
                             setTeamMembers(teamList);
+                        });
+
+                        // Fetch real-time ticket count
+                        unsubscribeTickets = onSnapshot(collection(db, "tickets"), (snapshot) => {
+                            setTotalTickets(snapshot.size);
                         });
 
                         // Fetch other dashboard data once
@@ -802,6 +981,7 @@ export default function AdminDashboard() {
             authCleanupPromise.then(cleanup => cleanup && cleanup());
             if (unsubscribeSettings) unsubscribeSettings();
             if (unsubscribeTeam) unsubscribeTeam();
+            if (unsubscribeTickets) unsubscribeTickets();
         };
     }, [router]);
 
@@ -868,7 +1048,7 @@ export default function AdminDashboard() {
         { id: "projects", label: "Projects", icon: Briefcase },
         { id: "users", label: "Users", icon: Users },
         { id: "payments", label: "Payments", icon: CreditCard },
-        { id: "messages", label: "Messages", icon: MessageSquare },
+        { id: "support", label: "Support Tickets", icon: MessageSquare },
         { id: "team", label: "Team", icon: UserPlus },
         { id: "settings", label: "Settings", icon: Settings },
     ];
@@ -935,6 +1115,7 @@ export default function AdminDashboard() {
                     totalUsers={totalUsers}
                     activeProjects={activeProjects}
                     pendingPayments={pendingPayments}
+                    totalTickets={totalTickets}
                     teamMembers={teamMembers}
                     onAddMember={handleAddTeamMember}
                     onDeleteMember={handleDeleteTeamMember}
@@ -943,6 +1124,7 @@ export default function AdminDashboard() {
             case "profile": return <ProfileSection user={user} loading={loading} teamMembers={teamMembers} />;
             case "projects": return <AdminProjects sheetUrl={sheetUrl} onUpdateUrl={handleUpdateSheetUrl} />;
             case "users": return <UsersSection users={allUsers} totalUsers={totalUsers} onDelete={handleDeleteUser} currentUserEmail={user?.email} />;
+            case "support": return <AdminSupportSection />;
             case "team": return (
                 <div className="space-y-6">
                     <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Team Management</h2>
@@ -981,6 +1163,16 @@ export default function AdminDashboard() {
                             <span className="font-medium">{item.label}</span>
                         </button>
                     ))}
+                    <button
+                        onClick={async () => {
+                            localStorage.removeItem("adminActiveSection");
+                            await signOut(auth);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors mt-auto"
+                    >
+                        <LogOut size={20} />
+                        <span className="font-medium">Logout</span>
+                    </button>
                 </nav>
             </aside>
 
