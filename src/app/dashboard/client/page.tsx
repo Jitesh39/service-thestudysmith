@@ -34,6 +34,18 @@ const getTimeGreeting = () => {
     return "Good Evening!";
 };
 
+// Helper to format dates to "10 February 2026"
+const formatDate = (dateString: string | undefined | null) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+    });
+};
+
 // Placeholder Components for Sections
 const OverviewSection = ({ user, projects }: { user: any; projects: any[] }) => {
     // Count 'Pending' (Work-in-progress) as Active projects
@@ -120,7 +132,7 @@ const PaymentsSection = ({ projects }: { projects: any[] }) => {
 
                                     return (
                                         <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="p-5 font-mono text-sm font-bold text-blue-600">{p.projectId}</td>
+                                            <td className="p-5 font-mono text-sm font-bold text-blue-600">{p.projectId || p.id}</td>
                                             <td className="p-5">
                                                 <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${isPaid ? 'bg-green-100 text-green-700' :
                                                     isHalf ? 'bg-blue-100 text-blue-700' :
@@ -289,13 +301,15 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
 
                 if (matched) {
                     await setDoc(doc(collection(db, "users", user.uid, "assignedProjects"), proj.projectId), {
+                        projectId: proj.projectId,
                         projectName: matched['project name'] || matched['title'] || proj.projectName || proj.title || "Untitled Project",
                         projectStatus: matched['project status'] || matched['status'] || proj.projectStatus || proj.status || "Pending",
                         enquireDate: matched['enquire date'] || matched['date'] || proj.enquireDate || proj.date || "",
+                        targetDate: matched['target date'] || matched['deadline'] || proj.targetDate || "N/A",
                         payment: matched['payment'] || matched['amount'] || proj.payment || "0",
                         paymentStatus: matched['payment status'] || matched['p-status'] || proj.paymentStatus || "Pending",
                         lastUpdated: serverTimestamp()
-                    });
+                    }, { merge: true });
                 }
             }
             setLastSynced(new Date().toLocaleTimeString());
@@ -309,7 +323,20 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
 
     const handleAddProject = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!projectIdInput.trim()) return;
+        const trimmedId = projectIdInput.trim();
+        if (!trimmedId) return;
+
+        // Check if project is already added
+        if (projects.some(p => p.projectId === trimmedId)) {
+            setError("Project ID already added to your list.");
+            setTimeout(() => {
+                setError(null);
+                setProjectIdInput("");
+                setIsAdding(false);
+            }, 3000);
+            return;
+        }
+
         setIsSubmitting(true);
         setError(null);
 
@@ -339,15 +366,16 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
             const matched = allData.find(row => {
                 const rowId = row['project id'] || row['id'] || row['projectid'];
                 const rowEmail = row['email address'] || row['email'] || row['client email'];
-                return rowId === projectIdInput.trim() && rowEmail?.toLowerCase() === user.email?.toLowerCase();
+                return rowId === trimmedId && rowEmail?.toLowerCase() === user.email?.toLowerCase();
             });
 
             if (matched) {
-                await setDoc(doc(collection(db, "users", user.uid, "assignedProjects"), projectIdInput.trim()), {
-                    projectId: projectIdInput.trim(),
+                await setDoc(doc(collection(db, "users", user.uid, "assignedProjects"), trimmedId), {
+                    projectId: trimmedId,
                     projectName: matched['project name'] || matched['title'] || "Untitled Project",
                     projectStatus: matched['project status'] || matched['status'] || "Pending",
                     enquireDate: matched['enquire date'] || matched['date'] || "",
+                    targetDate: matched['target date'] || matched['deadline'] || "N/A",
                     payment: matched['payment'] || matched['amount'] || "0",
                     paymentStatus: matched['payment status'] || matched['p-status'] || "Pending",
                     addedAt: serverTimestamp(),
@@ -358,6 +386,11 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
                 handleSyncData(true);
             } else {
                 setError("No project found with this ID and your email.");
+                setTimeout(() => {
+                    setError(null);
+                    setProjectIdInput("");
+                    setIsAdding(false);
+                }, 3000);
             }
         } catch (err: any) {
             setError(err.message || "Failed to add project.");
@@ -409,7 +442,7 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
                                 type="text"
                                 value={projectIdInput}
                                 onChange={(e) => setProjectIdInput(e.target.value)}
-                                placeholder="Enter ID e.g. TSS-2024-001"
+                                placeholder="For Example - 1001"
                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-mono font-bold"
                             />
                         </div>
@@ -440,6 +473,7 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
                                 <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Project ID</th>
                                 <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Project Name</th>
                                 <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Enquire Date</th>
+                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Target Date</th>
                                 <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Status</th>
                                 <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Payment</th>
                                 <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Payment Status</th>
@@ -451,23 +485,19 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
                                     <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
                                         <td className="p-4">
                                             <span className="font-mono text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                                                {proj.projectId}
+                                                {proj.projectId || proj.id}
                                             </span>
                                         </td>
                                         <td className="p-4">
                                             <p className="font-semibold text-slate-800">{proj.projectName || proj.title}</p>
                                         </td>
                                         <td className="p-4 text-slate-500 text-sm text-center">
-                                            {(() => {
-                                                const dateStr = proj.enquireDate || proj.date;
-                                                if (!dateStr) return 'N/A';
-                                                const d = new Date(dateStr);
-                                                return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('en-GB', {
-                                                    day: 'numeric',
-                                                    month: 'long',
-                                                    year: 'numeric'
-                                                });
-                                            })()}
+                                            {formatDate(proj.enquireDate || proj.date)}
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                                                {formatDate(proj.targetDate)}
+                                            </span>
                                         </td>
                                         <td className="p-4 text-center">
                                             <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${(proj.projectStatus || proj.status)?.toLowerCase() === 'completed' ? 'bg-green-100 text-green-700' :

@@ -25,6 +25,9 @@ import {
     UserPlus,
     Calendar,
     Mail,
+    Package,
+    ChevronDown,
+    ChevronUp,
     Briefcase as BriefcaseIcon
 } from "lucide-react";
 
@@ -35,8 +38,21 @@ const getTimeGreeting = () => {
     return "Good Evening!";
 };
 
+// Helper to format dates to "10 February 2026"
+const formatDate = (dateString: string | undefined | null) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+    });
+};
+
 const AdminOverview = ({
     user,
+    loading,
     totalUsers,
     activeProjects,
     pendingPayments,
@@ -46,6 +62,7 @@ const AdminOverview = ({
     onDeleteMember
 }: {
     user: any;
+    loading: boolean;
     totalUsers: number;
     activeProjects: number;
     pendingPayments: number;
@@ -55,29 +72,51 @@ const AdminOverview = ({
     onDeleteMember: (id: string) => void;
 }) => (
     <div className="space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
-            <div>
-                <h2 className="text-3xl font-extrabold text-slate-900">{getTimeGreeting()} <span className="text-blue-600">{user?.displayName || 'Admin'}</span> 👋</h2>
-                <p className="text-slate-500 mt-2 font-medium">System performance and user engagement overview.</p>
-            </div>
-        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <div className="lg:col-span-2 group">
+                <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-100 h-full flex flex-col relative overflow-hidden">
+                    {/* Unique background element */}
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50/50 rounded-full -mr-16 -mt-16 blur-3xl transition-all group-hover:bg-blue-100/50"></div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
-                <p className="text-slate-500 text-sm font-medium mb-1 uppercase tracking-wider">Total Users</p>
-                <p className="text-3xl font-bold text-blue-600">{totalUsers}</p>
+                    <div className="text-center md:text-left relative z-10 mb-8">
+                        <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">{getTimeGreeting()} <span className="text-blue-600">{user?.displayName || 'Admin'}</span> 👋</h2>
+                        <p className="text-slate-500 mt-2 font-medium text-sm md:text-base max-w-md">System performance and user engagement overview.</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-5 -mt-2 relative z-10 max-w-xl mx-auto w-full">
+                        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-500 transform hover:-translate-y-2 flex flex-col items-center text-center group/card">
+                            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 mb-3 group-hover/card:scale-110 transition-transform duration-500">
+                                <Users size={20} />
+                            </div>
+                            <p className="text-slate-400 text-[9px] font-black uppercase tracking-[0.2em] mb-1">Total Users</p>
+                            <p className="text-xl md:text-3xl font-black text-slate-900">{totalUsers}</p>
+                        </div>
+                        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 hover:border-green-200 hover:shadow-xl hover:shadow-green-500/10 transition-all duration-500 transform hover:-translate-y-2 flex flex-col items-center text-center group/card">
+                            <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center text-green-600 mb-3 group-hover/card:scale-110 transition-transform duration-500">
+                                <Briefcase size={20} />
+                            </div>
+                            <p className="text-slate-400 text-[9px] font-black uppercase tracking-[0.2em] mb-1">Active Projects</p>
+                            <p className="text-xl md:text-3xl font-black text-slate-900">{activeProjects}</p>
+                        </div>
+                        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 hover:border-yellow-200 hover:shadow-xl hover:shadow-yellow-500/10 transition-all duration-500 transform hover:-translate-y-2 flex flex-col items-center text-center group/card">
+                            <div className="w-10 h-10 bg-yellow-50 rounded-xl flex items-center justify-center text-yellow-600 mb-3 group-hover/card:scale-110 transition-transform duration-500">
+                                <CreditCard size={20} />
+                            </div>
+                            <p className="text-slate-400 text-[9px] font-black uppercase tracking-[0.2em] mb-1">Pending Payment</p>
+                            <p className="text-xl md:text-3xl font-black text-slate-900">{pendingPayments}</p>
+                        </div>
+                        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 hover:border-purple-200 hover:shadow-xl hover:shadow-purple-500/10 transition-all duration-500 transform hover:-translate-y-2 flex flex-col items-center text-center group/card">
+                            <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600 mb-3 group-hover/card:scale-110 transition-transform duration-500">
+                                <MessageSquare size={20} />
+                            </div>
+                            <p className="text-slate-400 text-[9px] font-black uppercase tracking-[0.2em] mb-1">Support Tickets</p>
+                            <p className="text-xl md:text-3xl font-black text-slate-900">{totalTickets}</p>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
-                <p className="text-slate-500 text-sm font-medium mb-1 uppercase tracking-wider">Active Projects</p>
-                <p className="text-3xl font-bold text-green-600">{activeProjects}</p>
-            </div>
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
-                <p className="text-slate-500 text-sm font-medium mb-1 uppercase tracking-wider">Pending Payments</p>
-                <p className="text-3xl font-bold text-yellow-600">{pendingPayments}</p>
-            </div>
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
-                <p className="text-slate-500 text-sm font-medium mb-1 uppercase tracking-wider">Support Tickets</p>
-                <p className="text-3xl font-bold text-purple-600">{totalTickets}</p>
+            <div className="lg:col-span-1">
+                <ProfileSection user={user} loading={loading} teamMembers={teamMembers} />
             </div>
         </div>
 
@@ -85,6 +124,8 @@ const AdminOverview = ({
             teamMembers={teamMembers}
             onAddMember={onAddMember}
             onDeleteMember={onDeleteMember}
+            hideHeader={true}
+            isDashboard={true}
         />
     </div>
 );
@@ -262,7 +303,7 @@ const AdminSupportSection = () => {
     );
 };
 
-const TeamSection = ({ teamMembers, onAddMember, onDeleteMember }: { teamMembers: any[], onAddMember: (member: any) => void, onDeleteMember: (id: string) => void }) => {
+const TeamSection = ({ teamMembers, onAddMember, onDeleteMember, hideHeader = false, isDashboard = false }: { teamMembers: any[], onAddMember: (member: any) => void, onDeleteMember: (id: string) => void, hideHeader?: boolean, isDashboard?: boolean }) => {
     const [isAdding, setIsAdding] = useState(false);
     const [newMember, setNewMember] = useState({
         name: "",
@@ -316,19 +357,21 @@ const TeamSection = ({ teamMembers, onAddMember, onDeleteMember }: { teamMembers
 
     return (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mt-8">
-            <div className="p-4 sm:p-6 border-b border-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/50">
-                <div>
-                    <h2 className="text-xl font-bold text-slate-800">Our Team</h2>
-                    <p className="text-sm text-slate-500 font-medium">Manage your team members and their roles</p>
+            {!hideHeader && (
+                <div className="p-4 sm:p-6 border-b border-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/50">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-800">Our Team</h2>
+                        <p className="text-sm text-slate-500 font-medium">Manage your team members and their roles</p>
+                    </div>
+                    <button
+                        onClick={() => setIsAdding(!isAdding)}
+                        className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-md shadow-blue-100 active:scale-95 w-full sm:w-auto"
+                    >
+                        {isAdding ? <X size={18} /> : <Plus size={18} />}
+                        {isAdding ? "Cancel" : "Add Member"}
+                    </button>
                 </div>
-                <button
-                    onClick={() => setIsAdding(!isAdding)}
-                    className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-md shadow-blue-100 active:scale-95 w-full sm:w-auto"
-                >
-                    {isAdding ? <X size={18} /> : <Plus size={18} />}
-                    {isAdding ? "Cancel" : "Add Member"}
-                </button>
-            </div>
+            )}
 
             {isAdding && (
                 <div className="p-6 bg-blue-50/30 border-b border-blue-50 animate-in slide-in-from-top duration-300">
@@ -425,7 +468,7 @@ const TeamSection = ({ teamMembers, onAddMember, onDeleteMember }: { teamMembers
                             <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Team Member</th>
                             <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-widest text-center">Designation</th>
                             <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-widest text-center">Joined Date</th>
-                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-widest text-right">Action</th>
+                            {!isDashboard && <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-widest text-right">Action</th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -466,21 +509,23 @@ const TeamSection = ({ teamMembers, onAddMember, onDeleteMember }: { teamMembers
                                             })}
                                         </div>
                                     </td>
-                                    <td className="p-4 text-right">
-                                        <button
-                                            onClick={() => {
-                                                if (confirm("Remove this team member?")) onDeleteMember(member.id);
-                                            }}
-                                            className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </td>
+                                    {!isDashboard && (
+                                        <td className="p-4 text-right">
+                                            <button
+                                                onClick={() => {
+                                                    if (confirm("Remove this team member?")) onDeleteMember(member.id);
+                                                }}
+                                                className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </td>
+                                    )}
                                 </tr>
                             ))
                         ) : (
                             <tr>
-                                <td colSpan={4} className="p-12 text-center text-slate-400 font-medium">
+                                <td colSpan={isDashboard ? 3 : 4} className="p-12 text-center text-slate-400 font-medium">
                                     No team members added yet.
                                 </td>
                             </tr>
@@ -510,14 +555,16 @@ const TeamSection = ({ teamMembers, onAddMember, onDeleteMember }: { teamMembers
                                         <p className="text-xs text-slate-500">{member.designation}</p>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => {
-                                        if (confirm("Remove this team member?")) onDeleteMember(member.id);
-                                    }}
-                                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                >
-                                    <Trash2 size={18} />
-                                </button>
+                                {!isDashboard && (
+                                    <button
+                                        onClick={() => {
+                                            if (confirm("Remove this team member?")) onDeleteMember(member.id);
+                                        }}
+                                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                )}
                             </div>
                             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-50">
                                 <div className="space-y-1">
@@ -570,7 +617,7 @@ const ProfileSection = ({ user, loading, teamMembers }: { user: any; loading: bo
     }
 
     return (
-        <div className="max-w-2xl bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-100">
+        <div className="h-full bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-100">
             <h2 className="text-xl md:text-2xl font-bold text-slate-800 mb-6 border-b border-slate-50 pb-4">Admin Profile</h2>
             <div className="space-y-8">
                 <div className="flex flex-col sm:flex-row items-center gap-5 pb-8 border-b border-slate-50">
@@ -643,20 +690,20 @@ const AdminProjects = ({ sheetUrl, onUpdateUrl }: { sheetUrl: string, onUpdateUr
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Project Tracker</h2>
-                    <p className="text-slate-500 text-sm font-medium">Real-time collaboration via Google Sheets</p>
+                    <h2 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight text-center lg:text-left">Project Tracker</h2>
+                    <p className="text-slate-500 text-sm font-medium text-center lg:text-left">Real-time collaboration via Google Sheets</p>
                 </div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full lg:w-auto">
+                <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
                     {lastSynced && !isEditing && (
-                        <div className="flex flex-col items-start sm:items-end">
+                        <div className="flex flex-col items-center sm:items-end">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Last Sync</span>
                             <span className="text-xs font-semibold text-blue-600">{lastSynced}</span>
                         </div>
                     )}
-                    <div className="flex flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
+                    <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 w-full sm:w-auto">
                         {sheetUrl && (
                             <button
                                 onClick={handleRefresh}
@@ -668,19 +715,17 @@ const AdminProjects = ({ sheetUrl, onUpdateUrl }: { sheetUrl: string, onUpdateUr
                         )}
                         <button
                             onClick={() => setIsEditing(!isEditing)}
-                            className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2 border ${isEditing
+                            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2 border ${isEditing
                                 ? "bg-slate-100 border-slate-200 text-slate-700"
                                 : "bg-white border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-600 shadow-sm"
                                 }`}
                         >
                             <Settings size={16} className={isEditing ? "animate-spin-slow" : ""} />
-                            <span className="hidden xs:inline">{isEditing ? "Cancel" : "Config Sheet"}</span>
-                            <span className="xs:hidden">{isEditing ? "Cancel" : "Config"}</span>
+                            <span>{isEditing ? "Cancel" : "Config Sheet"}</span>
                         </button>
-                        <button className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2">
+                        <button className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2">
                             <Briefcase size={16} />
-                            <span className="hidden xs:inline">Add Project</span>
-                            <span className="xs:hidden">Add</span>
+                            <span>Add Project</span>
                         </button>
                     </div>
                 </div>
@@ -723,25 +768,42 @@ const AdminProjects = ({ sheetUrl, onUpdateUrl }: { sheetUrl: string, onUpdateUr
                 </div>
             )}
 
-            <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden h-[500px] md:h-[700px] relative group border-t-4 border-t-blue-500">
+            <div className="bg-white rounded-2xl md:rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden h-[400px] sm:h-[500px] md:h-[600px] lg:h-[750px] relative group border-t-4 border-t-blue-500">
                 {sheetUrl ? (
-                    <div className="w-full h-full relative">
-                        {isRefreshing && (
-                            <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center animate-in fade-in duration-300">
-                                <div className="flex flex-col items-center gap-3">
-                                    <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
-                                    <p className="text-blue-600 font-bold text-sm">Syncing Data...</p>
+                    <div className="w-full h-full relative flex flex-col">
+                        {/* Mobile view helper */}
+                        <div className="lg:hidden bg-blue-50/50 border-b border-blue-100 px-4 py-2 flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1">
+                                <Eye size={12} /> Scroll inside sheet to view
+                            </span>
+                            <a
+                                href={sheetUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[10px] font-black text-blue-700 bg-blue-100 px-2 py-0.5 rounded uppercase flex items-center gap-1"
+                            >
+                                Full Screen <Eye size={10} />
+                            </a>
+                        </div>
+
+                        <div className="flex-1 overflow-x-auto relative">
+                            {isRefreshing && (
+                                <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center animate-in fade-in duration-300">
+                                    <div className="flex flex-col items-center gap-3">
+                                        <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
+                                        <p className="text-blue-600 font-bold text-sm">Syncing Data...</p>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
-                        <iframe
-                            key={refreshKey}
-                            src={getFinalUrl(sheetUrl)}
-                            className="w-full h-full border-0"
-                            allowFullScreen
-                            loading="lazy"
-                            title="Active Projects Sheet"
-                        />
+                            )}
+                            <iframe
+                                key={refreshKey}
+                                src={getFinalUrl(sheetUrl)}
+                                className="w-full h-full border-0 min-w-[320px]"
+                                allowFullScreen
+                                loading="lazy"
+                                title="Active Projects Sheet"
+                            />
+                        </div>
                     </div>
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center p-12 text-center bg-slate-50/30">
@@ -761,6 +823,102 @@ const AdminProjects = ({ sheetUrl, onUpdateUrl }: { sheetUrl: string, onUpdateUr
                         </button>
                     </div>
                 )}
+            </div>
+        </div>
+    );
+};
+
+const AssignedProjectsSection = ({ projects, users, onDelete }: { projects: any[], users: any[], onDelete: (uid: string, pid: string) => void }) => {
+    return (
+        <div className="space-y-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden transition-all duration-300">
+                <div className="w-full px-4 py-4 md:px-6 md:py-5 border-b border-slate-50 bg-slate-50/10 flex items-center justify-between">
+                    <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+                        <Package className="text-blue-600 shrink-0 w-5 h-5 md:w-6 md:h-6" />
+                        <h2 className="text-base md:text-xl font-black text-slate-800 tracking-tight uppercase truncate">
+                            Active Client <span className="text-blue-600">Project</span>
+                        </h2>
+                        <span className="shrink-0 text-[10px] md:text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                            {projects.length}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto animate-in slide-in-from-top-2 duration-300 scrollbar-thin scrollbar-thumb-slate-200">
+                    <table className="w-full text-left min-w-[600px] md:min-w-full">
+                        <thead className="bg-slate-50/50 border-b border-slate-100">
+                            <tr>
+                                <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">ID</th>
+                                <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Project</th>
+                                <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Client</th>
+                                <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Enquired Date</th>
+                                <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Target Date</th>
+                                <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
+                                <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {projects.length > 0 ? (
+                                projects.map((proj, i) => {
+                                    const client = users.find(u => u.uid === proj.uid);
+                                    return (
+                                        <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
+                                            <td className="p-3 md:p-4">
+                                                <span className="font-mono text-[10px] md:text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                                    {proj.projectId || proj.docId || "N/A"}
+                                                </span>
+                                            </td>
+                                            <td className="p-3 md:p-4">
+                                                <p className="font-bold text-slate-700 text-xs md:text-sm">{proj.projectName || "No Title Set"}</p>
+                                            </td>
+                                            <td className="p-3 md:p-4">
+                                                <div className="space-y-0.5">
+                                                    <p className="text-[10px] md:text-xs font-bold text-slate-700">{client?.displayName || "Unknown"}</p>
+                                                    <p className="text-[10px] text-slate-400 font-medium italic truncate max-w-[120px] md:max-w-none">{client?.email || "No Email"}</p>
+                                                </div>
+                                            </td>
+                                            <td className="p-3 md:p-4 text-center">
+                                                <p className="text-[10px] font-bold text-slate-600 bg-slate-50 px-2 py-1 rounded border border-slate-100">{formatDate(proj.enquireDate || proj.date)}</p>
+                                            </td>
+                                            <td className="p-3 md:p-4 text-center">
+                                                <p className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100">{formatDate(proj.targetDate)}</p>
+                                            </td>
+                                            <td className="p-3 md:p-4 text-center">
+                                                <span className={`px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[9px] md:text-[10px] font-bold uppercase tracking-widest border ${(proj.projectStatus || proj.status)?.toLowerCase() === 'completed'
+                                                    ? 'bg-green-50 text-green-700 border-green-100'
+                                                    : 'bg-blue-50 text-blue-700 border-blue-100'
+                                                    }`}>
+                                                    {proj.projectStatus || proj.status || "Active"}
+                                                </span>
+                                            </td>
+                                            <td className="p-3 md:p-4 text-right">
+                                                <button
+                                                    onClick={() => {
+                                                        if (confirm(`Remove project ID ${proj.projectId || proj.docId}?`)) {
+                                                            onDelete(proj.uid, proj.docId);
+                                                        }
+                                                    }}
+                                                    className="p-1.5 md:p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                                >
+                                                    <Trash2 className="w-4 h-4 md:w-[18px] md:h-[18px]" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            ) : (
+                                <tr>
+                                    <td colSpan={7} className="p-12 md:p-20 text-center">
+                                        <div className="flex flex-col items-center gap-3">
+                                            <BriefcaseIcon className="text-slate-200 w-10 h-10 md:w-12 md:h-12" />
+                                            <p className="text-slate-400 font-bold text-sm md:text-lg">No active project IDs found.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );
@@ -908,6 +1066,7 @@ export default function AdminDashboard() {
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
     const [user, setUser] = useState<any>(null);
     const [sheetUrl, setSheetUrl] = useState("");
+    const [assignedProjects, setAssignedProjects] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
@@ -915,6 +1074,7 @@ export default function AdminDashboard() {
         let unsubscribeSettings: (() => void) | undefined;
         let unsubscribeTeam: (() => void) | undefined;
         let unsubscribeTickets: (() => void) | undefined;
+        let unsubscribeProjects: (() => void) | undefined;
 
         const checkAuth = async () => {
             const unsubscribeAuth = auth.onAuthStateChanged(async (currentUser) => {
@@ -942,13 +1102,30 @@ export default function AdminDashboard() {
                         // Fetch real-time team members
                         unsubscribeTeam = onSnapshot(collection(db, "team"), (snapshot) => {
                             const teamList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                            setTeamMembers(teamList);
+                            // Sort by joinedDate (oldest first)
+                            const sortedTeam = [...teamList].sort((a: any, b: any) => {
+                                const dateA = new Date(a.joinedDate).getTime();
+                                const dateB = new Date(b.joinedDate).getTime();
+                                return dateA - dateB;
+                            });
+                            setTeamMembers(sortedTeam);
                         });
 
                         // Fetch real-time active (open) ticket count
                         const openTicketsQuery = query(collection(db, "tickets"), where("status", "==", "open"));
                         unsubscribeTickets = onSnapshot(openTicketsQuery, (snapshot) => {
                             setTotalTickets(snapshot.size);
+                        });
+
+                        // Fetch real-time active projects from all clients
+                        unsubscribeProjects = onSnapshot(collectionGroup(db, "assignedProjects"), (snapshot) => {
+                            const projectsList = snapshot.docs.map(doc => ({
+                                ...doc.data(),
+                                docId: doc.id,
+                                uid: doc.ref.path.split('/')[1] // Safer way to get parent document ID from collectionGroup
+                            }));
+                            setAssignedProjects(projectsList);
+                            setActiveProjects(snapshot.size);
                         });
 
                         // Fetch other dashboard data once
@@ -970,10 +1147,6 @@ export default function AdminDashboard() {
 
                             setAllUsers(sortedUsers);
                             setTotalUsers(usersSnapshot.size);
-
-                            // Fetch total active projects from all clients
-                            const projectsSnapshot = await getDocs(collectionGroup(db, "assignedProjects"));
-                            setActiveProjects(projectsSnapshot.size);
                         } catch (error) {
                             console.error("Error fetching dashboard data:", error);
                         }
@@ -993,6 +1166,7 @@ export default function AdminDashboard() {
             if (unsubscribeSettings) unsubscribeSettings();
             if (unsubscribeTeam) unsubscribeTeam();
             if (unsubscribeTickets) unsubscribeTickets();
+            if (unsubscribeProjects) unsubscribeProjects();
         };
     }, [router]);
 
@@ -1027,41 +1201,81 @@ export default function AdminDashboard() {
                     return result;
                 };
 
-                const headers = splitRow(rows[0]).map(h => h.toLowerCase());
+                const headers = splitRow(rows[0]).map(h => h.toLowerCase().trim());
                 const statusIndex = headers.findIndex(h =>
                     ['payment status', 'status', 'paymentstatus', 'pay status'].includes(h)
+                );
+                const idIndex = headers.findIndex(h =>
+                    ['project id', 'id', 'projectid'].includes(h)
+                );
+                const enquiredIndex = headers.findIndex(h =>
+                    ['enquired date', 'enquired', 'enquire date', 'date'].includes(h)
+                );
+                const targetIndex = headers.findIndex(h =>
+                    ['target date', 'target'].includes(h)
+                );
+                const nameIndex = headers.findIndex(h =>
+                    ['project name', 'project', 'title'].includes(h)
                 );
 
                 if (statusIndex === -1) {
                     setPendingPayments(0);
-                    return;
+                } else {
+                    let count = 0;
+                    for (let i = 1; i < rows.length; i++) {
+                        const values = splitRow(rows[i]);
+                        if (values[statusIndex]?.toLowerCase() === 'pending') {
+                            count++;
+                        }
+                    }
+                    setPendingPayments(count);
                 }
 
-                let count = 0;
-                for (let i = 1; i < rows.length; i++) {
-                    const values = splitRow(rows[i]);
-                    if (values[statusIndex]?.toLowerCase() === 'pending') {
-                        count++;
+                // Sync project details with Firestore
+                if (idIndex !== -1 && assignedProjects.length > 0) {
+                    for (let i = 1; i < rows.length; i++) {
+                        const values = splitRow(rows[i]);
+                        const sheetPid = values[idIndex]?.trim();
+                        if (!sheetPid) continue;
+
+                        const matchedProj = assignedProjects.find(p => p.projectId === sheetPid);
+                        if (matchedProj) {
+                            const updates: any = {};
+                            const sheetEnquired = enquiredIndex !== -1 ? values[enquiredIndex]?.trim() : null;
+                            const sheetTarget = targetIndex !== -1 ? values[targetIndex]?.trim() : null;
+                            const sheetStatus = statusIndex !== -1 ? values[statusIndex]?.trim() : null;
+                            const sheetName = nameIndex !== -1 ? values[nameIndex]?.trim() : null;
+
+                            if (sheetEnquired && matchedProj.enquireDate !== sheetEnquired) updates.enquireDate = sheetEnquired;
+                            if (sheetTarget && matchedProj.targetDate !== sheetTarget) updates.targetDate = sheetTarget;
+                            if (sheetStatus && matchedProj.paymentStatus !== sheetStatus) updates.paymentStatus = sheetStatus;
+                            if (sheetName && matchedProj.projectName !== sheetName) updates.projectName = sheetName;
+
+                            if (Object.keys(updates).length > 0) {
+                                const projRef = doc(db, "users", matchedProj.uid, "assignedProjects", matchedProj.docId);
+                                await setDoc(projRef, updates, { merge: true });
+                            }
+                        }
                     }
                 }
-                setPendingPayments(count);
             } catch (error) {
-                console.error("Error fetching pending payments:", error);
+                console.error("Error fetching sheet data:", error);
             }
         };
 
         fetchPendingPayments();
-    }, [sheetUrl]);
+    }, [sheetUrl, assignedProjects]);
+
+    const isSuperAdmin = user?.email === "thestudysmithpu@gmail.com";
 
     const menuItems = [
         { id: "overview", label: "Dashboard", icon: LayoutDashboard },
-        { id: "profile", label: "Admin Profile", icon: User },
-        { id: "projects", label: "Projects", icon: Briefcase },
+        { id: "projects", label: "Projects Tracker", icon: Briefcase },
+        { id: "active-ids", label: "Active Client Projects", icon: Package },
         { id: "users", label: "Users", icon: Users },
         { id: "payments", label: "Payments", icon: CreditCard },
         { id: "support", label: "Support Tickets", icon: MessageSquare },
-        { id: "team", label: "Team", icon: UserPlus },
-        { id: "settings", label: "Settings", icon: Settings },
+        ...(isSuperAdmin ? [{ id: "settings", label: "Control Panel", icon: Settings }] : []),
     ];
 
     const handleAddTeamMember = async (member: any) => {
@@ -1102,6 +1316,20 @@ export default function AdminDashboard() {
         }
     };
 
+    const handleDeleteProjectID = async (uid: string, docId: string) => {
+        if (!uid || !docId) {
+            alert("Error: Missing identification data for this project assignment.");
+            return;
+        }
+        try {
+            await deleteDoc(doc(db, "users", uid, "assignedProjects", docId));
+            alert("Project ID removed successfully from user!");
+        } catch (error) {
+            console.error("Error deleting project ID:", error);
+            alert("Failed to remove project ID.");
+        }
+    };
+
     const handleUpdateSheetUrl = async (url: string) => {
         try {
             await setDoc(doc(db, "settings", "dashboard"), {
@@ -1123,6 +1351,7 @@ export default function AdminDashboard() {
             case "overview": return (
                 <AdminOverview
                     user={user}
+                    loading={loading}
                     totalUsers={totalUsers}
                     activeProjects={activeProjects}
                     pendingPayments={pendingPayments}
@@ -1132,20 +1361,23 @@ export default function AdminDashboard() {
                     onDeleteMember={handleDeleteTeamMember}
                 />
             );
-            case "profile": return <ProfileSection user={user} loading={loading} teamMembers={teamMembers} />;
             case "projects": return <AdminProjects sheetUrl={sheetUrl} onUpdateUrl={handleUpdateSheetUrl} />;
+            case "active-ids": return <AssignedProjectsSection projects={assignedProjects} users={allUsers} onDelete={handleDeleteProjectID} />;
             case "users": return <UsersSection users={allUsers} totalUsers={totalUsers} onDelete={handleDeleteUser} currentUserEmail={user?.email} />;
             case "support": return <AdminSupportSection />;
-            case "team": return (
-                <div className="space-y-6">
-                    <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Team Management</h2>
-                    <TeamSection
-                        teamMembers={teamMembers}
-                        onAddMember={handleAddTeamMember}
-                        onDeleteMember={handleDeleteTeamMember}
-                    />
-                </div>
-            );
+            case "settings":
+                if (!isSuperAdmin) {
+                    return <div className="p-8 text-center text-red-500 font-bold">Access Denied: Super Admin Only</div>;
+                }
+                return (
+                    <div className="space-y-6">
+                        <TeamSection
+                            teamMembers={teamMembers}
+                            onAddMember={handleAddTeamMember}
+                            onDeleteMember={handleDeleteTeamMember}
+                        />
+                    </div>
+                );
             default: return <div className="p-8 text-center text-slate-500">Section under construction</div>;
         }
     };
