@@ -22,7 +22,7 @@ const projects = [
     },
     {
         title: "ResumeForge AI",
-        description: "Comprehensive hospital management system handling patient records, appointments, and doctor scheduling efficiently.",
+        description: "A simple platform that offers ready-to-use resume templates to help you build a professional CV quickly and easily.",
         image: "project-demo/resumeforgeai.png",
         demoUrl: "https://resumeforgeai-pi.vercel.app/"
     },

@@ -345,11 +345,9 @@ export default function Home() {
 
             {/* Right Side: Text & Quick Actions */}
             <div className="text-white text-center md:text-left">
-              <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Submit Your Project?</h2>
+              <h2 className="text-3xl md:text-4xl font-bold mb-6">Let's Talk About Your Project</h2>
               <p className="text-blue-100 mb-8 text-lg leading-relaxed">
-                Don't let the deadline scare you. Fill out the form or connect with us instantly for a high-quality, Web project.
-              </p>
-
+                Got an idea? Need help? Or just want to chat about what’s possible? Fill out the form below, WhatsApp us, or call our team — we’ll get back to you soon.</p>
               <div className="flex flex-col gap-4 max-w-sm mx-auto md:mx-0">
                 <Link href="https://wa.me/919508086078?text=Hi!%20I%20visited%20TheStudySmith%20website%20and%20would%20like%20to%20know%20more%20about%20your%20Web%20Development%20services.%0A%0AMessage%20from%3A%20Services-TheStudySmith%0AWebsite%20inquiry"
                   target="_blank"

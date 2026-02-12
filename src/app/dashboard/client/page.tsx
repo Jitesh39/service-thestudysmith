@@ -47,9 +47,12 @@ const formatDate = (dateString: string | undefined | null) => {
 };
 
 // Placeholder Components for Sections
-const OverviewSection = ({ user, projects }: { user: any; projects: any[] }) => {
+const OverviewSection = ({ user, projects, tickets, loading }: { user: any; projects: any[]; tickets: any[]; loading: boolean }) => {
     // Count 'Pending' (Work-in-progress) as Active projects
     const activeCount = projects.filter(p => (p.projectStatus || p.status)?.toLowerCase() === 'pending').length;
+
+    // Count 'open' support tickets
+    const activeTicketsCount = tickets.filter(t => t.status === 'open').length;
 
     // Payment Logic: count 'Pending' as 1, identify '50% Paid' as 'Half Paid'
     const pendingPaymentsCount = projects.filter(p => p.paymentStatus?.toLowerCase() === 'pending').length;
@@ -85,9 +88,36 @@ const OverviewSection = ({ user, projects }: { user: any; projects: any[] }) => 
                     </p>
                 </div>
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
-                    <p className="text-slate-500 text-sm font-medium mb-1 uppercase tracking-wider">Unread Messages</p>
-                    <p className="text-3xl font-bold text-purple-600">0</p>
+                    <p className="text-slate-500 text-sm font-medium mb-1 uppercase tracking-wider">Active Support Ticket</p>
+                    <p className="text-3xl font-bold text-purple-600">{activeTicketsCount}</p>
                 </div>
+            </div>
+
+            <div className="mt-8">
+                {loading ? (
+                    <div className="max-w-md bg-white p-8 rounded-xl shadow-sm border border-slate-100 animate-pulse">
+                        <div className="flex items-center gap-4">
+                            <div className="w-16 h-16 rounded-full bg-slate-200"></div>
+                            <div className="space-y-2">
+                                <div className="h-5 w-32 bg-slate-200 rounded"></div>
+                                <div className="h-4 w-48 bg-slate-200 rounded"></div>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="max-w-md bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                        <div className="flex items-center gap-5">
+                            <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-white text-2xl font-bold shadow-inner shrink-0">
+                                {user?.displayName ? user.displayName.charAt(0).toUpperCase() : (user?.email ? user.email.charAt(0).toUpperCase() : 'U')}
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-0.5">Logged in as</p>
+                                <h3 className="text-lg font-bold text-slate-900 truncate">{user?.displayName || 'User Account'}</h3>
+                                <p className="text-slate-500 font-medium text-sm truncate">{user?.email}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -180,64 +210,6 @@ const PaymentsSection = ({ projects }: { projects: any[] }) => {
     );
 };
 
-const ProfileSection = ({ user, loading }: { user: any; loading: boolean }) => {
-    if (loading) {
-        return (
-            <div className="max-w-2xl bg-white p-8 rounded-xl shadow-sm border border-slate-100 animate-pulse">
-                <div className="h-8 w-48 bg-slate-200 rounded mb-6"></div>
-                <div className="flex items-center gap-4 mb-8">
-                    <div className="w-20 h-20 rounded-full bg-slate-200"></div>
-                    <div className="space-y-2">
-                        <div className="h-5 w-32 bg-slate-200 rounded"></div>
-                        <div className="h-4 w-48 bg-slate-200 rounded"></div>
-                    </div>
-                </div>
-                <div className="space-y-6">
-                    <div className="space-y-2">
-                        <div className="h-4 w-24 bg-slate-200 rounded"></div>
-                        <div className="h-10 w-full bg-slate-100 rounded"></div>
-                    </div>
-                    <div className="space-y-2">
-                        <div className="h-4 w-24 bg-slate-200 rounded"></div>
-                        <div className="h-10 w-full bg-slate-100 rounded"></div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="max-w-2xl bg-white p-8 rounded-xl shadow-sm border border-slate-100">
-            <h2 className="text-2xl font-bold text-slate-800 mb-6">My Profile</h2>
-            <div className="space-y-8">
-                <div className="flex items-center gap-5 pb-6 border-b border-slate-50">
-                    <div className="w-20 h-20 rounded-full bg-blue-600 flex items-center justify-center text-white text-3xl font-bold shadow-inner">
-                        {user?.displayName ? user.displayName.charAt(0).toUpperCase() : (user?.email ? user.email.charAt(0).toUpperCase() : 'U')}
-                    </div>
-                    <div>
-                        <h3 className="text-xl font-bold text-slate-900">{user?.displayName || 'User Account'}</h3>
-                        <p className="text-slate-500 font-medium">{user?.email}</p>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-6">
-                    <div>
-                        <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest">Full Name</label>
-                        <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-700 font-semibold text-lg shadow-sm">
-                            {user?.displayName || 'Not Set'}
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest">Email Address</label>
-                        <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-700 font-semibold text-lg shadow-sm">
-                            {user?.email || 'Not Set'}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 const ProjectsSection = ({ user, loading, projects }: { user: any; loading: boolean; projects: any[] }) => {
     const [isAdding, setIsAdding] = useState(false);
@@ -550,83 +522,112 @@ const NotificationsSection = () => {
     return (
         <div className="max-w-4xl space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
-                <div>
-                    <h2 className="text-3xl font-extrabold text-slate-900">Platform <span className="text-blue-600">Guide</span></h2>
-                    <p className="text-slate-500 mt-2 font-medium italic">Welcome to your step-by-step guide. Follow these instructions to track your project updates effectively.</p>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 className="text-3xl font-extrabold text-slate-900">System <span className="text-blue-600">Notifications</span></h2>
+                        <p className="text-slate-500 mt-2 font-medium italic">Stay updated with the latest platform changes and follow the guide to manage your account.</p>
+                    </div>
                 </div>
             </div>
 
-            <div className="grid gap-6">
-                <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-6 hover:shadow-md transition-all group">
-                    <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shrink-0 font-extrabold text-2xl shadow-lg shadow-blue-100 group-hover:scale-110 transition-transform">1</div>
-                    <div>
-                        <h3 className="text-2xl font-bold text-slate-800 mb-3 flex items-center gap-2">Step 1: My Profile</h3>
-                        <p className="text-slate-600 leading-relaxed font-medium">After logging in, visit any time the <span className="text-blue-600 font-bold italic">"My Profile"</span> section from the sidebar. Here you can verify your registered <span className="font-bold underline decoration-blue-200">Full Name</span> and <span className="font-bold underline decoration-blue-200">Email ID</span> assigned to your account.</p>
-                    </div>
+            {/* Latest Updates Card */}
+            {/* <div className="bg-blue-600 rounded-2xl p-6 text-white shadow-xl shadow-blue-100 flex items-center gap-6">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
+                    <Bell size={24} className="animate-bounce" />
                 </div>
+                <div>
+                    <h4 className="font-bold text-lg">Platform Update: Profile Integration</h4>
+                    <p className="text-blue-100 text-sm font-medium">We've moved your Profile details directly into the Overview section for easier access. You can now view your account details as soon as you log in!</p>
+                </div>
+            </div> */}
 
-                <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-6 hover:shadow-md transition-all group border-l-4 border-l-blue-600">
-                    <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shrink-0 font-extrabold text-2xl shadow-lg shadow-blue-100 group-hover:scale-110 transition-transform">2</div>
-                    <div className="space-y-6 flex-1">
+            <div className="space-y-6">
+                <h3 className="text-xl font-bold text-slate-800 px-2 flex items-center gap-2">
+                    <LayoutDashboard size={20} className="text-blue-600" />
+                    Working Directions
+                </h3>
+
+                <div className="grid gap-6">
+                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-6 hover:shadow-md transition-all group border-l-4 border-l-blue-600">
+                        <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shrink-0 font-extrabold text-2xl shadow-lg shadow-blue-100 group-hover:scale-110 transition-transform">1</div>
                         <div>
-                            <h3 className="text-2xl font-bold text-slate-800 mb-3">Step 2: My Projects</h3>
-                            <p className="text-slate-600 leading-relaxed font-medium">This is the core of your portal where you can view, track, and manage all your project progress and financial details in <span className="text-blue-600 font-bold underline">real-time</span>.</p>
-                        </div>
-                        <div className="grid md:grid-cols-2 gap-4">
-                            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 hover:bg-slate-100 transition-colors">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <div className="p-2 bg-white rounded-lg shadow-sm text-blue-600"><RefreshCw size={20} /></div>
-                                    <h4 className="font-bold text-slate-800">Refresh Project Details</h4>
-                                </div>
-                                <p className="text-sm text-slate-500 font-medium leading-relaxed">Located at the top-right. Instantly update status, payment history, and progress details from our team's sheet.</p>
-                            </div>
-                            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 hover:bg-slate-100 transition-colors">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <div className="p-2 bg-white rounded-lg shadow-sm text-blue-600"><Plus size={20} /></div>
-                                    <h4 className="font-bold text-slate-800">Add Project by ID</h4>
-                                </div>
-                                <p className="text-sm text-slate-500 font-medium leading-relaxed">Enter the unique Project ID provided by our company to link more active projects to your dashboard.</p>
-                            </div>
-                        </div>
-                        <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100/50">
-                            <h4 className="font-bold text-blue-900 mb-4 flex items-center gap-2"><Package size={18} /> Understanding Project Columns:</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                                <div className="border-l-2 border-blue-200 pl-3">
-                                    <p className="text-sm font-bold text-blue-800">Project ID & Name</p>
-                                    <p className="text-xs text-blue-600/80 font-medium font-bold italic">Unique tracking ID and the confirmed project title discussed with you.</p>
-                                </div>
-                                <div className="border-l-2 border-blue-200 pl-3">
-                                    <p className="text-sm font-bold text-blue-800">Enquiry Date</p>
-                                    <p className="text-xs text-blue-600/80 font-medium font-bold italic">The official date when your initial enquiry was logged.</p>
-                                </div>
-                                <div className="border-l-2 border-blue-200 pl-3">
-                                    <p className="text-sm font-bold text-blue-800">Project Status</p>
-                                    <p className="text-xs text-blue-600/80 font-medium font-bold italic"><span className="text-slate-900">Pending</span> (Work-in-progress) or <span className="text-green-700">Completed</span> (Delivered).</p>
-                                </div>
-                                <div className="border-l-2 border-blue-200 pl-3">
-                                    <p className="text-sm font-bold text-blue-800">Payment & Status</p>
-                                    <p className="text-xs text-blue-600/80 font-medium font-bold italic"><span className="text-slate-900">Agreed Amount, 50% Paid</span>, or <span className="text-green-700">Full Paid</span>.</p>
-                                </div>
-                            </div>
+                            <h3 className="text-2xl font-bold text-slate-800 mb-3 flex items-center gap-2">Dashboard Overview</h3>
+                            <p className="text-slate-600 leading-relaxed font-medium">The <span className="text-blue-600 font-bold italic">"Overview"</span> is your command center. It now combines your project stats, ticket tracking, and <span className="font-bold underline decoration-blue-200">Personal Profile</span> details in one unified view. No more switching tabs to check your login info.</p>
                         </div>
                     </div>
-                </div>
 
-                <div className="grid md:grid-cols-3 gap-6">
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4 group">
-                        <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center text-green-600 font-extrabold text-xl group-hover:rotate-12 transition-transform">3</div>
-                        <h3 className="text-xl font-bold text-slate-800">Payments</h3>
-                        <p className="text-sm text-slate-500 font-medium leading-relaxed">Make secure online payments for active projects and track your transaction history.</p>
+                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-6 hover:shadow-md transition-all group border-l-4 border-l-blue-600">
+                        <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shrink-0 font-extrabold text-2xl shadow-lg shadow-blue-100 group-hover:scale-110 transition-transform">2</div>
+                        <div className="space-y-8 flex-1">
+                            <div>
+                                <h3 className="text-2xl font-bold text-slate-800 mb-3">Step 2: My Projects - Table Guide</h3>
+                                <p className="text-slate-600 leading-relaxed font-medium">This section allows you to link your active projects and track their progress in real-time. Follow the steps below to get started.</p>
+                            </div>
+
+                            <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100">
+                                <h4 className="font-bold text-blue-900 mb-4 flex items-center gap-2">
+                                    <div className="p-1.5 bg-blue-600 text-white rounded-lg"><Plus size={16} /></div>
+                                    How to Add Your Project:
+                                </h4>
+                                <div className="space-y-4">
+                                    <div className="flex gap-4">
+                                        <div className="w-6 h-6 rounded-full bg-blue-200 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">1</div>
+                                        <p className="text-sm text-slate-700 font-medium">Click on the <span className="text-blue-600 font-bold">"Add Project by ID"</span> button at the top right of the Projects page.</p>
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <div className="w-6 h-6 rounded-full bg-blue-200 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">2</div>
+                                        <p className="text-sm text-slate-700 font-medium">Enter your <span className="text-blue-600 font-bold">Unique Project ID</span> (e.g., 1001) provided by our team.</p>
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <div className="w-6 h-6 rounded-full bg-blue-200 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">3</div>
+                                        <p className="text-sm text-slate-700 font-medium">Click <span className="text-blue-600 font-bold">"Verify & Add Project"</span>. The system will match the ID with your email and add it to your list.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <h4 className="font-bold text-slate-800 px-2 flex items-center gap-2">
+                                    <FileText size={18} className="text-blue-600" />
+                                    Understanding the Project Table:
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                        <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-1">Project ID & Name</p>
+                                        <p className="text-xs text-slate-500 font-medium leading-relaxed italic">Your unique reference number and the official title of your project.</p>
+                                    </div>
+                                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                        <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-1">Enquire & Target Date</p>
+                                        <p className="text-xs text-slate-500 font-medium leading-relaxed italic">Shows when you first contacted us and the estimated delivery deadline.</p>
+                                    </div>
+                                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                        <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-1">Status</p>
+                                        <p className="text-xs text-slate-500 font-medium leading-relaxed italic">Tracking progress: <span className="text-yellow-600 font-bold">Pending</span> (In progress) or <span className="text-green-600 font-bold">Completed</span>.</p>
+                                    </div>
+                                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                        <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-1">Payment Details</p>
+                                        <p className="text-xs text-slate-500 font-medium leading-relaxed italic">Displays the agreed amount and whether the payment is <span className="text-blue-600 font-bold">Partial (50%)</span> or <span className="text-green-600 font-bold">Full Paid</span>.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4 group">
-                        <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 font-extrabold text-xl group-hover:rotate-12 transition-transform">4</div>
-                        <h3 className="text-xl font-bold text-slate-800">Documents</h3>
-                        <p className="text-sm text-slate-500 font-medium leading-relaxed">Access company policies, Privacy Terms, and Return Policy provided by TheStudySmith.</p>
-                    </div>
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4 group">
-                        <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600 font-extrabold text-xl group-hover:rotate-12 transition-transform">5</div>
-                        <h3 className="text-xl font-bold text-slate-800">Support</h3>
-                        <p className="text-sm text-slate-500 font-medium leading-relaxed">Facing issues? Raise a ticket and our expert team will assist you as soon as possible.</p>
+
+                    <div className="grid md:grid-cols-3 gap-6">
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4 group hover:border-blue-200 transition-all">
+                            <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center text-green-600 font-extrabold text-xl group-hover:rotate-12 transition-transform">3</div>
+                            <h3 className="text-xl font-bold text-slate-800">Payments</h3>
+                            <p className="text-sm text-slate-500 font-medium leading-relaxed">Securely track project balances and transaction history provided by our finance team.</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4 group hover:border-blue-200 transition-all">
+                            <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 font-extrabold text-xl group-hover:rotate-12 transition-transform">4</div>
+                            <h3 className="text-xl font-bold text-slate-800">Documents</h3>
+                            <p className="text-sm text-slate-500 font-medium leading-relaxed">Access all legal agreements and project files delivered straight to your registered email.</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4 group hover:border-blue-200 transition-all">
+                            <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600 font-extrabold text-xl group-hover:rotate-12 transition-transform">5</div>
+                            <h3 className="text-xl font-bold text-slate-800">Support</h3>
+                            <p className="text-sm text-slate-500 font-medium leading-relaxed">Our help center is active 24/7. Raise a ticket and track resolutions in the support history.</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -654,7 +655,7 @@ const DocumentsSection = () => {
                         To ensure security and official record-keeping, <span className="font-bold underline decoration-blue-300">all Project Documents will be sent directly through email</span> to your registered email address.
                     </p>
                     <p className="text-blue-600/70 text-sm mt-3 font-medium">
-                        Please check your inbox (and spam folder) for files related to your active projects.
+                        Please check your inbox for files related to your active projects.
                     </p>
                 </div>
             </div>
@@ -681,36 +682,12 @@ const DocumentsSection = () => {
     );
 };
 
-const SupportSection = ({ user }: { user: any }) => {
+const SupportSection = ({ user, tickets }: { user: any; tickets: any[] }) => {
     const [isRaising, setIsRaising] = useState(false);
     const [subject, setSubject] = useState("");
     const [message, setMessage] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [tickets, setTickets] = useState<any[]>([]);
     const [error, setError] = useState<string | null>(null);
-
-    // Fetch user's tickets based on Email ID
-    useEffect(() => {
-        if (!user?.email) return;
-
-        // Removed orderBy to ensure it works without manual index creation
-        const q = query(
-            collection(db, "tickets"),
-            where("userEmail", "==", user.email)
-        );
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const ticketList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-            // Sort manually by date (newest first)
-            ticketList.sort((a, b) => {
-                const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
-                const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
-                return dateB - dateA;
-            });
-            setTickets(ticketList);
-        });
-        return () => unsubscribe();
-    }, [user?.email]);
 
     const handleRaiseTicket = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -905,8 +882,30 @@ export default function ClientDashboard() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [user, setUser] = useState<any>(null);
     const [projects, setProjects] = useState<any[]>([]);
+    const [tickets, setTickets] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
+
+    // Fetch user's tickets based on Email ID
+    useEffect(() => {
+        if (!user?.email) return;
+
+        const q = query(
+            collection(db, "tickets"),
+            where("userEmail", "==", user.email)
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const ticketList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+            ticketList.sort((a, b) => {
+                const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
+                const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
+                return dateB - dateA;
+            });
+            setTickets(ticketList);
+        });
+        return () => unsubscribe();
+    }, [user?.email]);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -947,7 +946,6 @@ export default function ClientDashboard() {
 
     const menuItems = [
         { id: "overview", label: "Overview", icon: LayoutDashboard },
-        { id: "profile", label: "My Profile", icon: User },
         { id: "projects", label: "My Projects", icon: Package },
         { id: "payments", label: "Payments", icon: CreditCard },
         { id: "documents", label: "Documents", icon: FileText },
@@ -957,12 +955,11 @@ export default function ClientDashboard() {
 
     const renderContent = () => {
         switch (activeSection) {
-            case "overview": return <OverviewSection user={user} projects={projects} />;
-            case "profile": return <ProfileSection user={user} loading={loading} />;
+            case "overview": return <OverviewSection user={user} projects={projects} tickets={tickets} loading={loading} />;
             case "projects": return <ProjectsSection user={user} loading={loading} projects={projects} />;
             case "payments": return <PaymentsSection projects={projects} />;
             case "documents": return <DocumentsSection />;
-            case "support": return <SupportSection user={user} />;
+            case "support": return <SupportSection user={user} tickets={tickets} />;
             case "notifications": return <NotificationsSection />;
             default: return <div className="p-8 text-center text-slate-500">Section under construction</div>;
         }
