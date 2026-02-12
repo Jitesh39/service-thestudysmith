@@ -456,7 +456,7 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
                                             </span>
                                         </td>
                                         <td className="p-4">
-                                            <p className="font-semibold text-slate-800">{proj.projectName || proj.title}</p>
+                                            <p className="font-bold text-slate-800">{proj.projectName || proj.title}</p>
                                         </td>
                                         <td className="p-4 text-slate-500 text-sm text-center">
                                             {formatDate(proj.enquireDate || proj.date)}
@@ -763,7 +763,7 @@ const SupportSection = ({ user, tickets }: { user: any; tickets: any[] }) => {
                                 value={subject}
                                 onChange={(e) => setSubject(e.target.value)}
                                 placeholder="Briefly describe the issue"
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-semibold"
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-bold"
                                 required
                             />
                         </div>
@@ -825,7 +825,7 @@ const SupportSection = ({ user, tickets }: { user: any; tickets: any[] }) => {
                                     <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
                                         <td className="p-4 font-mono text-xs font-bold text-blue-600">{ticket.ticketId || "N/A"}</td>
                                         <td className="p-4">
-                                            <p className="font-semibold text-slate-800">{ticket.subject}</p>
+                                            <p className="font-bold text-slate-800">{ticket.subject}</p>
                                         </td>
                                         <td className="p-4">
                                             <p className="text-xs text-slate-500 max-w-[200px] truncate font-medium italic">{ticket.message}</p>

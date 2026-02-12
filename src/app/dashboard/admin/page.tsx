@@ -696,7 +696,7 @@ const ProfileSection = ({ user, loading, teamMembers }: { user: any; loading: bo
     );
 };
 
-const AdminProjects = ({ sheetUrl, onUpdateUrl }: { sheetUrl: string, onUpdateUrl: (url: string) => void }) => {
+const AdminProjects = ({ sheetUrl, onUpdateUrl, isSuperAdmin }: { sheetUrl: string, onUpdateUrl: (url: string) => void, isSuperAdmin: boolean }) => {
     const [tempUrl, setTempUrl] = useState(sheetUrl);
     const [isEditing, setIsEditing] = useState(false);
     const [refreshKey, setRefreshKey] = useState(Date.now());
@@ -740,33 +740,36 @@ const AdminProjects = ({ sheetUrl, onUpdateUrl }: { sheetUrl: string, onUpdateUr
                     {lastSynced && !isEditing && (
                         <div className="flex flex-col items-center sm:items-end">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Last Sync</span>
-                            <span className="text-xs font-semibold text-blue-600">{lastSynced}</span>
+                            <span className="text-xs font-bold text-blue-600">{lastSynced}</span>
                         </div>
                     )}
                     <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 w-full sm:w-auto">
                         {sheetUrl && (
                             <button
                                 onClick={handleRefresh}
-                                className={`p-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-blue-600 hover:border-blue-200 shadow-sm transition-all active:scale-95 ${isRefreshing ? "bg-blue-50" : ""}`}
+                                className={`px-4 py-2.5 mr-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-blue-600 hover:border-blue-200 shadow-sm transition-all active:scale-95 flex items-center gap-2 ${isRefreshing ? "bg-blue-50" : ""}`}
                                 title="Sync Sheet Now"
                             >
-                                <RefreshCw size={18} className={isRefreshing ? "animate-spin" : ""} />
+                                <RefreshCw size={16} className={isRefreshing ? "animate-spin" : ""} />
+                                <span className="text-xs sm:text-sm font-bold">Refresh Sheet</span>
                             </button>
                         )}
-                        <button
-                            onClick={() => setIsEditing(!isEditing)}
-                            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2 border ${isEditing
-                                ? "bg-slate-100 border-slate-200 text-slate-700"
-                                : "bg-white border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-600 shadow-sm"
-                                }`}
-                        >
-                            <Settings size={16} className={isEditing ? "animate-spin-slow" : ""} />
-                            <span>{isEditing ? "Cancel" : "Config Sheet"}</span>
-                        </button>
-                        <button className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2">
+                        {isSuperAdmin && (
+                            <button
+                                onClick={() => setIsEditing(!isEditing)}
+                                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 border ${isEditing
+                                    ? "bg-slate-100 border-slate-200 text-slate-700"
+                                    : "bg-white border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-600 shadow-sm"
+                                    }`}
+                            >
+                                <Settings size={16} className={isEditing ? "animate-spin-slow" : ""} />
+                                <span>{isEditing ? "Cancel" : "Config Sheet"}</span>
+                            </button>
+                        )}
+                        {/* <button className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2">
                             <Briefcase size={16} />
                             <span>Add Project</span>
-                        </button>
+                        </button> */}
                     </div>
                 </div>
             </div>
@@ -936,7 +939,7 @@ const AdminPaymentsSection = ({ projects }: { projects: any[] }) => {
     );
 };
 
-const AssignedProjectsSection = ({ projects, users, onDelete }: { projects: any[], users: any[], onDelete: (uid: string, pid: string) => void }) => {
+const AssignedProjectsSection = ({ projects, users, onDelete, isSuperAdmin }: { projects: any[], users: any[], onDelete: (uid: string, pid: string) => void, isSuperAdmin: boolean }) => {
     const totalDelivered = projects.filter(p =>
         (p.projectStatus || p.status || "").toLowerCase() === "completed" ||
         (p.projectStatus || p.status || "").toLowerCase() === "complete"
@@ -982,7 +985,7 @@ const AssignedProjectsSection = ({ projects, users, onDelete }: { projects: any[
                                 <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Enquired Date</th>
                                 <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Target Date</th>
                                 <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
-                                <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
+                                {isSuperAdmin && <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Action</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -1019,24 +1022,26 @@ const AssignedProjectsSection = ({ projects, users, onDelete }: { projects: any[
                                                     {proj.projectStatus || proj.status || "Active"}
                                                 </span>
                                             </td>
-                                            <td className="p-3 md:p-4 text-right">
-                                                <button
-                                                    onClick={() => {
-                                                        if (confirm(`Remove project ID ${proj.projectId || proj.docId}?`)) {
-                                                            onDelete(proj.uid, proj.docId);
-                                                        }
-                                                    }}
-                                                    className="p-1.5 md:p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                                >
-                                                    <Trash2 className="w-4 h-4 md:w-[18px] md:h-[18px]" />
-                                                </button>
-                                            </td>
+                                            {isSuperAdmin && (
+                                                <td className="p-3 md:p-4 text-right">
+                                                    <button
+                                                        onClick={() => {
+                                                            if (confirm(`Remove project ID ${proj.projectId || proj.docId}?`)) {
+                                                                onDelete(proj.uid, proj.docId);
+                                                            }
+                                                        }}
+                                                        className="p-1.5 md:p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                                    >
+                                                        <Trash2 className="w-4 h-4 md:w-[18px] md:h-[18px]" />
+                                                    </button>
+                                                </td>
+                                            )}
                                         </tr>
                                     );
                                 })
                             ) : (
                                 <tr>
-                                    <td colSpan={7} className="p-12 md:p-20 text-center">
+                                    <td colSpan={isSuperAdmin ? 7 : 6} className="p-12 md:p-20 text-center">
                                         <div className="flex flex-col items-center gap-3">
                                             <BriefcaseIcon className="text-slate-200 w-10 h-10 md:w-12 md:h-12" />
                                             <p className="text-slate-400 font-bold text-sm md:text-lg">No active project IDs found.</p>
@@ -1105,7 +1110,7 @@ const UsersSection = ({ users, totalUsers, onDelete, currentUserEmail }: { users
                                                 <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs">
                                                     {u.displayName?.charAt(0) || 'U'}
                                                 </div>
-                                                <span className="font-semibold text-slate-700">{u.displayName || 'N/A'}</span>
+                                                <span className="font-bold text-slate-700">{u.displayName || 'N/A'}</span>
                                             </div>
                                         </td>
                                         <td className="p-4 text-slate-600 font-medium">{u.email}</td>
@@ -1170,7 +1175,7 @@ const UsersSection = ({ users, totalUsers, onDelete, currentUserEmail }: { users
     );
 };
 
-const FinanceSection = ({ assignedProjects, teamMembers, onAddMember, onDeleteMember }: { assignedProjects: any[], teamMembers: any[], onAddMember: (m: any) => void, onDeleteMember: (id: string) => void }) => {
+const FinanceSection = ({ assignedProjects, isSuperAdmin, user }: { assignedProjects: any[], isSuperAdmin: boolean, user: any }) => {
     const [totalInvestment, setTotalInvestment] = useState(0);
     const [investments, setInvestments] = useState<any[]>([]);
     const [amount, setAmount] = useState("");
@@ -1221,7 +1226,8 @@ const FinanceSection = ({ assignedProjects, teamMembers, onAddMember, onDeleteMe
                 amount: parseFloat(amount),
                 reason: reason,
                 reasonType: reasonType,
-                createdAt: serverTimestamp()
+                createdAt: serverTimestamp(),
+                addedBy: user?.displayName || user?.email || "Unknown Admin"
             });
             setAmount("");
             setReason("");
@@ -1255,12 +1261,35 @@ const FinanceSection = ({ assignedProjects, teamMembers, onAddMember, onDeleteMe
         maximumFractionDigits: 0
     }).format(totalInvestment);
 
+    const overallProfit = totalRevenue - totalInvestment;
+    const isProfit = overallProfit >= 0;
+    const formattedProfit = new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 0
+    }).format(Math.abs(overallProfit));
+
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Cards */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                 <h2 className="text-xl font-bold text-slate-800 mb-6">Financial Overview</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Total Revenue */}
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex items-center gap-5 relative overflow-hidden group">
+                        <div className="absolute right-0 top-0 opacity-5 transform translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform">
+                            <TrendingUp size={100} />
+                        </div>
+                        <div className="p-4 bg-white text-green-500 rounded-2xl shadow-sm relative z-10">
+                            <TrendingUp size={28} />
+                        </div>
+                        <div className="relative z-10">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Revenue</p>
+                            <h3 className="text-3xl font-black text-slate-800">{formattedRevenue}</h3>
+                        </div>
+                    </div>
+
+                    {/* Total Investment */}
                     <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex items-center gap-5 relative overflow-hidden group">
                         <div className="absolute right-0 top-0 opacity-5 transform translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform">
                             <TrendingDown size={100} />
@@ -1273,16 +1302,117 @@ const FinanceSection = ({ assignedProjects, teamMembers, onAddMember, onDeleteMe
                             <h3 className="text-3xl font-black text-slate-800">{formattedInvestment}</h3>
                         </div>
                     </div>
+
+                    {/* Overall Profit */}
                     <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex items-center gap-5 relative overflow-hidden group">
                         <div className="absolute right-0 top-0 opacity-5 transform translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform">
-                            <TrendingUp size={100} />
+                            {isProfit ? <TrendingUp size={100} /> : <TrendingDown size={100} />}
                         </div>
-                        <div className="p-4 bg-white text-green-500 rounded-2xl shadow-sm relative z-10">
-                            <TrendingUp size={28} />
+                        <div className={`p-4 bg-white ${isProfit ? 'text-green-600' : 'text-red-500'} rounded-2xl shadow-sm relative z-10`}>
+                            {isProfit ? <TrendingUp size={28} /> : <TrendingDown size={28} />}
                         </div>
                         <div className="relative z-10">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Revenue</p>
-                            <h3 className="text-3xl font-black text-slate-800">{formattedRevenue}</h3>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Overall Profit</p>
+                            <h3 className={`text-3xl font-black ${isProfit ? 'text-green-600' : 'text-red-600'}`}>
+                                {isProfit ? '+' : '-'}{formattedProfit}
+                            </h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Profit Analytics Graph */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="md:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center relative overflow-hidden">
+                    <h3 className="text-slate-500 text-xs font-black uppercase tracking-widest mb-6 absolute top-6 left-6">Net Profit Margin</h3>
+
+                    <div className="relative w-32 h-32 flex items-center justify-center mt-6">
+                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 192 192">
+                            {/* Background Circle */}
+                            <circle
+                                cx="96"
+                                cy="96"
+                                r="88"
+                                stroke="currentColor"
+                                strokeWidth="12"
+                                fill="transparent"
+                                className="text-slate-50"
+                            />
+                            {/* Progress Circle */}
+                            <circle
+                                cx="96"
+                                cy="96"
+                                r="88"
+                                stroke="currentColor"
+                                strokeWidth="12"
+                                fill="transparent"
+                                strokeDasharray={2 * Math.PI * 88}
+                                strokeDashoffset={2 * Math.PI * 88 * (1 - Math.min(Math.abs(isProfit
+                                    ? (totalRevenue > 0 ? overallProfit / totalRevenue : 0)
+                                    : (totalInvestment > 0 ? overallProfit / totalInvestment : 0)
+                                ), 1))}
+                                strokeLinecap="round"
+                                className={`${isProfit ? 'text-green-500' : 'text-red-500'} transition-all duration-1000 ease-out`}
+                            />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                            <span className={`text-2xl font-black ${isProfit ? 'text-green-600' : 'text-red-600'}`}>
+                                {(Math.abs(isProfit
+                                    ? (totalRevenue > 0 ? overallProfit / totalRevenue : 0)
+                                    : (totalInvestment > 0 ? overallProfit / totalInvestment : 0)
+                                ) * 100).toFixed(1)}%
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">
+                                {isProfit ? 'Profit' : 'Loss'} Ratio
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="md:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-center">
+                    <div className="flex items-center justify-between mb-8">
+                        <div>
+                            <h3 className="text-lg font-black text-slate-800">Revenue vs Investment</h3>
+                            <p className="text-slate-500 text-xs font-bold">Capital efficiency visualization</p>
+                        </div>
+                        <div className="flex gap-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                <span className="text-xs font-bold text-slate-600">Revenue</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                                <span className="text-xs font-bold text-slate-600">Investment</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-6">
+                        {/* Revenue Bar */}
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-xs font-bold">
+                                <span className="text-slate-600">Total Revenue Generated</span>
+                                <span className="text-green-600">{formattedRevenue} (100%)</span>
+                            </div>
+                            <div className="h-4 bg-slate-100 rounded-full overflow-hidden w-full">
+                                <div className="h-full bg-green-500 rounded-full w-full animate-in slide-in-from-left duration-1000"></div>
+                            </div>
+                        </div>
+
+                        {/* Investment Bar */}
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-xs font-bold">
+                                <span className="text-slate-600">Total Capital Invested</span>
+                                <span className="text-red-600">
+                                    {formattedInvestment} ({totalRevenue > 0 ? ((totalInvestment / totalRevenue) * 100).toFixed(1) : totalInvestment > 0 ? '100' : '0'}%)
+                                </span>
+                            </div>
+                            <div className="h-4 bg-slate-100 rounded-full overflow-hidden w-full">
+                                <div
+                                    className="h-full bg-red-500 rounded-full transition-all duration-1000"
+                                    style={{ width: `${Math.min((totalRevenue > 0 ? (totalInvestment / totalRevenue) * 100 : (totalInvestment > 0 ? 100 : 0)), 100)}%` }}
+                                ></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1358,9 +1488,10 @@ const FinanceSection = ({ assignedProjects, teamMembers, onAddMember, onDeleteMe
                     <table className="w-full text-left">
                         <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-100">
                             <tr>
+                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Admin Name</th>
                                 <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
-                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</th>
                                 <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
+                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</th>
                                 <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Details</th>
                             </tr>
                         </thead>
@@ -1369,23 +1500,28 @@ const FinanceSection = ({ assignedProjects, teamMembers, onAddMember, onDeleteMe
                                 investments.map((inv) => (
                                     <React.Fragment key={inv.id}>
                                         <tr className="hover:bg-slate-50 transition-colors group">
+                                            <td className="p-4">
+                                                <p className="text-xs font-bold text-slate-700">{inv.addedBy || "N/A"}</p>
+                                            </td>
                                             <td className="p-4 text-xs font-bold text-slate-500">
                                                 {inv.createdAt?.toDate ? inv.createdAt.toDate().toLocaleDateString('en-GB') : "Just Now"}
-                                            </td>
-                                            <td className="p-4">
-                                                <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">{inv.reasonType || "Expense"}</span>
                                             </td>
                                             <td className="p-4 font-mono font-bold text-red-600 text-sm">
                                                 - {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(inv.amount)}
                                             </td>
+                                            <td className="p-4">
+                                                <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">{inv.reasonType || "Expense"}</span>
+                                            </td>
                                             <td className="p-4 text-right flex items-center justify-end gap-2">
-                                                <button
-                                                    onClick={() => handleDeleteInvestment(inv.id, inv.amount)}
-                                                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                                    title="Delete Record"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
+                                                {isSuperAdmin && (
+                                                    <button
+                                                        onClick={() => handleDeleteInvestment(inv.id, inv.amount)}
+                                                        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                        title="Delete Record"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => toggleExpand(inv.id)}
                                                     className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
@@ -1396,7 +1532,7 @@ const FinanceSection = ({ assignedProjects, teamMembers, onAddMember, onDeleteMe
                                         </tr>
                                         {expandedIds.includes(inv.id) && (
                                             <tr className="bg-slate-50/50 animate-in fade-in">
-                                                <td colSpan={4} className="p-4 pt-0">
+                                                <td colSpan={5} className="p-4 pt-0">
                                                     <div className="p-3 bg-white border border-slate-100 rounded-xl text-xs text-slate-600 font-medium italic shadow-sm ml-12">
                                                         <span className="font-bold not-italic text-slate-400 uppercase tracking-widest mr-2 text-[10px]">Reason:</span>
                                                         {inv.reason}
@@ -1408,7 +1544,7 @@ const FinanceSection = ({ assignedProjects, teamMembers, onAddMember, onDeleteMe
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={4} className="p-12 text-center text-slate-400 text-sm font-medium">No investments recorded yet.</td>
+                                    <td colSpan={5} className="p-12 text-center text-slate-400 text-sm font-medium">No investments recorded yet.</td>
                                 </tr>
                             )}
                         </tbody>
@@ -1416,11 +1552,6 @@ const FinanceSection = ({ assignedProjects, teamMembers, onAddMember, onDeleteMe
                 </div>
             </div>
 
-            <TeamSection
-                teamMembers={teamMembers}
-                onAddMember={onAddMember}
-                onDeleteMember={onDeleteMember}
-            />
         </div>
     );
 };
@@ -1658,7 +1789,10 @@ export default function AdminDashboard() {
         { id: "users", label: "Users", icon: Users },
         { id: "payments", label: "Payments", icon: CreditCard },
         { id: "support", label: "Support Tickets", icon: MessageSquare },
-        ...(isSuperAdmin ? [{ id: "settings", label: "Control Panel", icon: Settings }] : []),
+        { id: "finance", label: "Financial Overview", icon: TrendingUp },
+        ...(isSuperAdmin ? [
+            { id: "settings", label: "Control Panel", icon: Settings }
+        ] : []),
     ];
 
     const handleAddTeamMember = async (member: any) => {
@@ -1744,16 +1878,22 @@ export default function AdminDashboard() {
                     onDeleteMember={handleDeleteTeamMember}
                 />
             );
-            case "projects": return <AdminProjects sheetUrl={sheetUrl} onUpdateUrl={handleUpdateSheetUrl} />;
-            case "active-ids": return <AssignedProjectsSection projects={assignedProjects} users={allUsers} onDelete={handleDeleteProjectID} />;
+            case "projects": return <AdminProjects sheetUrl={sheetUrl} onUpdateUrl={handleUpdateSheetUrl} isSuperAdmin={isSuperAdmin} />;
+            case "active-ids": return <AssignedProjectsSection projects={assignedProjects} users={allUsers} onDelete={handleDeleteProjectID} isSuperAdmin={isSuperAdmin} />;
             case "users": return <UsersSection users={allUsers} totalUsers={totalUsers} onDelete={handleDeleteUser} currentUserEmail={user?.email} />;
             case "payments": return <AdminPaymentsSection projects={assignedProjects} />;
             case "support": return <AdminSupportSection />;
+            case "finance":
+                return <FinanceSection assignedProjects={assignedProjects} isSuperAdmin={isSuperAdmin} user={user} />;
             case "settings":
                 if (!isSuperAdmin) {
                     return <div className="p-8 text-center text-red-500 font-bold">Access Denied: Super Admin Only</div>;
                 }
-                return <FinanceSection assignedProjects={assignedProjects} teamMembers={teamMembers} onAddMember={handleAddTeamMember} onDeleteMember={handleDeleteTeamMember} />;
+                return <TeamSection
+                    teamMembers={teamMembers}
+                    onAddMember={handleAddTeamMember}
+                    onDeleteMember={handleDeleteTeamMember}
+                />;
             default: return <div className="p-8 text-center text-slate-500">Section under construction</div>;
         }
     };
