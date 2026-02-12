@@ -18,7 +18,7 @@ export default function LoaderUI() {
                         <div className="h-full bg-blue-600 rounded-full animate-progress origin-left w-full"></div>
                     </div>
                     {/* Person for initial load */}
-                    <div className="absolute -top-8 left-0 animate-run-person text-2xl">💀</div>
+                    <div className="absolute -top-8 left-0 animate-run-person text-2xl"></div>
                 </div>
             </div>
         </div>

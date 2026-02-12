@@ -43,7 +43,7 @@ export default function Template({ children }: { children: React.ReactNode }) {
                                     transition={{ duration: 1.2, ease: "linear" }}
                                 >
                                     {/* Using a running emoji or icon for now, replace with actual GIF path if available */}
-                                    <div className="w-full h-full text-2xl" role="img" aria-label="running person">💀</div>
+                                    <div className="w-full h-full text-2xl" role="img" aria-label="running person"></div>
                                 </motion.div>
 
                                 {/* Progress Bar Track */}
