@@ -1,35 +1,56 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { signOut } from "firebase/auth";
+import { signOut, onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs, deleteDoc, setDoc, onSnapshot, collectionGroup, query, orderBy, where } from "firebase/firestore";
+import {
+    collection,
+    query,
+    where,
+    getDocs,
+    doc,
+    deleteDoc,
+    updateDoc,
+    setDoc,
+    orderBy,
+    limit,
+    serverTimestamp,
+    addDoc,
+    collectionGroup,
+    getCountFromServer,
+    getDoc,
+    onSnapshot
+} from "firebase/firestore";
 import Link from "next/link";
 import {
     LayoutDashboard,
     Users,
-    Briefcase,
-    CreditCard,
-    MessageSquare,
     Settings,
     LogOut,
     Menu,
     X,
+    MessageSquare,
+    CheckCircle,
+    Clock,
     User,
-    Eye,
-    EyeOff,
+    Mail,
+    Phone,
+    Plus,
     Trash2,
     RefreshCw,
-    Plus,
-    UserPlus,
-    Calendar,
-    Mail,
+    CreditCard,
     Package,
     ChevronDown,
     ChevronUp,
-    Briefcase as BriefcaseIcon
+    Briefcase as BriefcaseIcon,
+    TrendingUp,
+    TrendingDown,
+    Briefcase,
+    Calendar,
+    Eye,
+    EyeOff
 } from "lucide-react";
+import React, { useState, useEffect } from "react";
 
 const getTimeGreeting = () => {
     const hour = new Date().getHours();
@@ -134,29 +155,36 @@ const AdminSupportSection = () => {
     const [tickets, setTickets] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const q = query(
-            collection(db, "tickets"),
-            orderBy("createdAt", "desc")
-        );
-
-        const unsubscribe = onSnapshot(q, (snapshot: any) => {
+    const fetchTickets = async () => {
+        setLoading(true);
+        try {
+            const q = query(
+                collection(db, "tickets"),
+                orderBy("createdAt", "desc"),
+                limit(50) // Limit to recent 50 tickets
+            );
+            const snapshot = await getDocs(q);
             const ticketList = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
             setTickets(ticketList);
-            setLoading(false);
-        }, (error: any) => {
-            console.error("Support Fetch Error:", error);
-            // Fallback without orderBy if index is missing
-            const fallbackQ = query(collection(db, "tickets"));
-            onSnapshot(fallbackQ, (snapshot: any) => {
+        } catch (error) {
+            console.error("Support Fetch Error (with ordering):", error);
+            // Fallback
+            try {
+                const fallbackQ = query(collection(db, "tickets"));
+                const snapshot = await getDocs(fallbackQ);
                 const ticketList = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as any));
                 ticketList.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
                 setTickets(ticketList);
-                setLoading(false);
-            });
-        });
+            } catch (err) {
+                console.error("Support Fetch Error (Fallback):", err);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
 
-        return () => unsubscribe();
+    useEffect(() => {
+        fetchTickets();
     }, []);
 
     const updateTicketStatus = async (id: string, newStatus: string) => {
@@ -170,8 +198,20 @@ const AdminSupportSection = () => {
     return (
         <div className="space-y-6 pb-10">
             <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
-                <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900">Support <span className="text-blue-600">Ticket Management</span></h2>
-                <p className="text-slate-500 mt-2 font-medium italic">Monitor and resolve help requests from your clients effectively.</p>
+                <div className="flex justify-between items-start md:items-center flex-col md:flex-row gap-4">
+                    <div>
+                        <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900">Support <span className="text-blue-600">Ticket Management</span></h2>
+                        <p className="text-slate-500 mt-2 font-medium italic">Monitor and resolve help requests from your clients effectively.</p>
+                    </div>
+                    <button
+                        onClick={fetchTickets}
+                        disabled={loading}
+                        className="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold shadow-sm hover:text-blue-600 hover:border-blue-200 transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
+                    >
+                        <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+                        Refresh Tickets
+                    </button>
+                </div>
             </div>
 
             {/* Desktop Table View */}
@@ -828,9 +868,97 @@ const AdminProjects = ({ sheetUrl, onUpdateUrl }: { sheetUrl: string, onUpdateUr
     );
 };
 
+const AdminPaymentsSection = ({ projects }: { projects: any[] }) => {
+    return (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {projects.length > 0 ? (
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-white">
+                        <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                            <CreditCard size={20} className="text-blue-600" />
+                            Projects Payment Status
+                        </h3>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1 rounded-full">
+                            {projects.length} Total Projects
+                        </span>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-50/50 border-b border-slate-50">
+                                <tr>
+                                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Project ID</th>
+                                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Payment Status</th>
+                                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Agreement Remark</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {projects.map((p, i) => {
+                                    const status = p.paymentStatus?.toLowerCase();
+                                    const isPaid = status === 'paid' || status === 'full paid';
+                                    const isHalf = status?.includes('50%');
+                                    const isPending = status === 'pending';
+
+                                    return (
+                                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                                            <td className="p-5 font-mono text-sm font-bold text-blue-600">{p.projectId || p.id}</td>
+                                            <td className="p-5">
+                                                <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${isPaid ? 'bg-green-100 text-green-700' :
+                                                    isHalf ? 'bg-blue-100 text-blue-700' :
+                                                        'bg-yellow-100 text-yellow-700'
+                                                    }`}>
+                                                    {isPaid ? 'Cleared' : isHalf ? 'Half Paid' : isPending ? 'Pending' : p.paymentStatus || 'Awaited'}
+                                                </span>
+                                            </td>
+                                            <td className="p-5 text-sm font-medium text-slate-500 italic">
+                                                {isPaid ? 'No balance remaining.' :
+                                                    isHalf ? '50% payment received.' :
+                                                        isPending ? 'Initial payment is awaited.' : 'Contact support for details.'}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ) : (
+                <div className="bg-white p-12 rounded-3xl border border-dashed border-slate-200 text-center space-y-4">
+                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-200">
+                        <CreditCard size={40} />
+                    </div>
+                    <div className="space-y-2">
+                        <h4 className="text-xl font-bold text-slate-800">No Projects Found</h4>
+                        <p className="text-slate-500 max-w-xs mx-auto text-sm">No active projects available to display payment status.</p>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const AssignedProjectsSection = ({ projects, users, onDelete }: { projects: any[], users: any[], onDelete: (uid: string, pid: string) => void }) => {
+    const totalDelivered = projects.filter(p =>
+        (p.projectStatus || p.status || "").toLowerCase() === "completed" ||
+        (p.projectStatus || p.status || "").toLowerCase() === "complete"
+    ).length;
+
     return (
         <div className="space-y-4">
+            {/* Total Delivered Section */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden transition-all duration-300">
+                <div className="w-full px-4 py-4 md:px-6 md:py-5 border-b border-slate-50 bg-green-50/10 flex items-center justify-between">
+                    <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+                        <Package className="text-green-600 shrink-0 w-5 h-5 md:w-6 md:h-6" />
+                        <h2 className="text-base md:text-xl font-black text-slate-800 tracking-tight uppercase truncate">
+                            Total Project <span className="text-green-600">Delivered</span>
+                        </h2>
+                        <span className="shrink-0 text-[10px] md:text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                            {totalDelivered}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden transition-all duration-300">
                 <div className="w-full px-4 py-4 md:px-6 md:py-5 border-b border-slate-50 bg-slate-50/10 flex items-center justify-between">
                     <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
@@ -1042,6 +1170,261 @@ const UsersSection = ({ users, totalUsers, onDelete, currentUserEmail }: { users
     );
 };
 
+const FinanceSection = ({ assignedProjects, teamMembers, onAddMember, onDeleteMember }: { assignedProjects: any[], teamMembers: any[], onAddMember: (m: any) => void, onDeleteMember: (id: string) => void }) => {
+    const [totalInvestment, setTotalInvestment] = useState(0);
+    const [investments, setInvestments] = useState<any[]>([]);
+    const [amount, setAmount] = useState("");
+    const [reason, setReason] = useState("");
+    const [reasonType, setReasonType] = useState("Other");
+    const [isAdding, setIsAdding] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [expandedIds, setExpandedIds] = useState<string[]>([]);
+
+    // Calculate Revenue
+    const totalRevenue = assignedProjects.reduce((acc, curr) => {
+        const status = (curr.paymentStatus || "").toLowerCase();
+        if (status === 'paid' || status === 'full paid' || status === 'cleared') {
+            const amountStr = (curr.payment || "0").toString().replace(/[^0-9.]/g, '');
+            const amount = parseFloat(amountStr) || 0;
+            return acc + amount;
+        }
+        return acc;
+    }, 0);
+
+    const formattedRevenue = new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 0
+    }).format(totalRevenue);
+
+    useEffect(() => {
+        const q = query(collection(db, "investments"), orderBy("createdAt", "desc"));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setInvestments(data);
+
+            // Calculate total from real-time data
+            const total = data.reduce((acc, curr: any) => acc + (parseFloat(curr.amount) || 0), 0);
+            setTotalInvestment(total);
+        }, (error) => {
+            console.error("Error fetching real-time investments:", error);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    const handleAddInvestment = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            await addDoc(collection(db, "investments"), {
+                amount: parseFloat(amount),
+                reason: reason,
+                reasonType: reasonType,
+                createdAt: serverTimestamp()
+            });
+            setAmount("");
+            setReason("");
+            setReasonType("Other");
+            setIsAdding(false);
+        } catch (error) {
+            console.error("Error adding investment:", error);
+            alert("Failed to add investment");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDeleteInvestment = async (id: string, amount: number) => {
+        if (!confirm(`Are you sure you want to delete this investment record of ₹${amount}?`)) return;
+        try {
+            await deleteDoc(doc(db, "investments", id));
+        } catch (error) {
+            console.error("Error deleting investment:", error);
+            alert("Failed to delete investment.");
+        }
+    };
+
+    const toggleExpand = (id: string) => {
+        setExpandedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    };
+
+    const formattedInvestment = new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 0
+    }).format(totalInvestment);
+
+    return (
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Cards */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h2 className="text-xl font-bold text-slate-800 mb-6">Financial Overview</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex items-center gap-5 relative overflow-hidden group">
+                        <div className="absolute right-0 top-0 opacity-5 transform translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform">
+                            <TrendingDown size={100} />
+                        </div>
+                        <div className="p-4 bg-white text-red-500 rounded-2xl shadow-sm relative z-10">
+                            <TrendingDown size={28} />
+                        </div>
+                        <div className="relative z-10">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Investment</p>
+                            <h3 className="text-3xl font-black text-slate-800">{formattedInvestment}</h3>
+                        </div>
+                    </div>
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex items-center gap-5 relative overflow-hidden group">
+                        <div className="absolute right-0 top-0 opacity-5 transform translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform">
+                            <TrendingUp size={100} />
+                        </div>
+                        <div className="p-4 bg-white text-green-500 rounded-2xl shadow-sm relative z-10">
+                            <TrendingUp size={28} />
+                        </div>
+                        <div className="relative z-10">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Revenue</p>
+                            <h3 className="text-3xl font-black text-slate-800">{formattedRevenue}</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Investment Management */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div className="p-6 border-b border-slate-50 flex items-center justify-between">
+                    <div>
+                        <h3 className="font-extrabold text-slate-800 text-lg">Investment Records</h3>
+                        <p className="text-sm text-slate-400 font-medium">Track operational expenses and capital.</p>
+                    </div>
+                    <button
+                        onClick={() => setIsAdding(!isAdding)}
+                        className="bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200"
+                    >
+                        {isAdding ? <X size={16} /> : <Plus size={16} />}
+                        {isAdding ? "Cancel" : "Add Investment"}
+                    </button>
+                </div>
+
+                {isAdding && (
+                    <div className="p-6 bg-slate-50 border-b border-slate-100 animate-in slide-in-from-top duration-300">
+                        <form onSubmit={handleAddInvestment} className="flex flex-col md:flex-row gap-4 items-end">
+                            <div className="w-full md:w-1/4 space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Amount (INR)</label>
+                                <input
+                                    type="number"
+                                    required
+                                    value={amount}
+                                    onChange={(e) => setAmount(e.target.value)}
+                                    placeholder="e.g. 5000"
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                            </div>
+                            <div className="w-full md:w-1/4 space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Category</label>
+                                <select
+                                    value={reasonType}
+                                    onChange={(e) => setReasonType(e.target.value)}
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer"
+                                >
+                                    <option>Marketing</option>
+                                    <option>Software</option>
+                                    <option>Salaries</option>
+                                    <option>Equipment</option>
+                                    <option>Other</option>
+                                </select>
+                            </div>
+                            <div className="w-full md:w-2/4 space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Details / Reason</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={reason}
+                                    onChange={(e) => setReason(e.target.value)}
+                                    placeholder="Brief description of the expense..."
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full md:w-auto bg-blue-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all disabled:opacity-50"
+                            >
+                                {loading ? "Saving..." : "Save Record"}
+                            </button>
+                        </form>
+                    </div>
+                )}
+
+                <div className="max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-100">
+                            <tr>
+                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
+                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</th>
+                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
+                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {investments.length > 0 ? (
+                                investments.map((inv) => (
+                                    <React.Fragment key={inv.id}>
+                                        <tr className="hover:bg-slate-50 transition-colors group">
+                                            <td className="p-4 text-xs font-bold text-slate-500">
+                                                {inv.createdAt?.toDate ? inv.createdAt.toDate().toLocaleDateString('en-GB') : "Just Now"}
+                                            </td>
+                                            <td className="p-4">
+                                                <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">{inv.reasonType || "Expense"}</span>
+                                            </td>
+                                            <td className="p-4 font-mono font-bold text-red-600 text-sm">
+                                                - {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(inv.amount)}
+                                            </td>
+                                            <td className="p-4 text-right flex items-center justify-end gap-2">
+                                                <button
+                                                    onClick={() => handleDeleteInvestment(inv.id, inv.amount)}
+                                                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                    title="Delete Record"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => toggleExpand(inv.id)}
+                                                    className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
+                                                >
+                                                    {expandedIds.includes(inv.id) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {expandedIds.includes(inv.id) && (
+                                            <tr className="bg-slate-50/50 animate-in fade-in">
+                                                <td colSpan={4} className="p-4 pt-0">
+                                                    <div className="p-3 bg-white border border-slate-100 rounded-xl text-xs text-slate-600 font-medium italic shadow-sm ml-12">
+                                                        <span className="font-bold not-italic text-slate-400 uppercase tracking-widest mr-2 text-[10px]">Reason:</span>
+                                                        {inv.reason}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={4} className="p-12 text-center text-slate-400 text-sm font-medium">No investments recorded yet.</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <TeamSection
+                teamMembers={teamMembers}
+                onAddMember={onAddMember}
+                onDeleteMember={onDeleteMember}
+            />
+        </div>
+    );
+};
+
 export default function AdminDashboard() {
     const [activeSection, setActiveSection] = useState<string>("");
 
@@ -1070,19 +1453,18 @@ export default function AdminDashboard() {
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
-    useEffect(() => {
-        let unsubscribeSettings: (() => void) | undefined;
-        let unsubscribeTeam: (() => void) | undefined;
-        let unsubscribeTickets: (() => void) | undefined;
-        let unsubscribeProjects: (() => void) | undefined;
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-        const checkAuth = async () => {
-            const unsubscribeAuth = auth.onAuthStateChanged(async (currentUser) => {
-                if (currentUser) {
-                    if (!currentUser.emailVerified) {
-                        router.push("/login");
-                        return;
-                    }
+    // Auth State Observer
+    useEffect(() => {
+        const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+            if (currentUser) {
+                if (!currentUser.emailVerified) {
+                    router.push("/login");
+                    return;
+                }
+
+                try {
                     const userDoc = await getDoc(doc(db, "users", currentUser.uid));
                     const userData = userDoc.data();
 
@@ -1090,85 +1472,86 @@ export default function AdminDashboard() {
                         router.push("/dashboard/client");
                     } else {
                         setUser({ ...currentUser, ...userData });
-                        setLoading(false);
-
-                        // Fetch real-time settings (including Google Sheet URL)
-                        unsubscribeSettings = onSnapshot(doc(db, "settings", "dashboard"), (settingsDoc) => {
-                            if (settingsDoc.exists()) {
-                                setSheetUrl(settingsDoc.data().sheetUrl || "");
-                            }
-                        });
-
-                        // Fetch real-time team members
-                        unsubscribeTeam = onSnapshot(collection(db, "team"), (snapshot) => {
-                            const teamList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                            // Sort by joinedDate (oldest first)
-                            const sortedTeam = [...teamList].sort((a: any, b: any) => {
-                                const dateA = new Date(a.joinedDate).getTime();
-                                const dateB = new Date(b.joinedDate).getTime();
-                                return dateA - dateB;
-                            });
-                            setTeamMembers(sortedTeam);
-                        });
-
-                        // Fetch real-time active (open) ticket count
-                        const openTicketsQuery = query(collection(db, "tickets"), where("status", "==", "open"));
-                        unsubscribeTickets = onSnapshot(openTicketsQuery, (snapshot) => {
-                            setTotalTickets(snapshot.size);
-                        });
-
-                        // Fetch real-time active projects from all clients
-                        unsubscribeProjects = onSnapshot(collectionGroup(db, "assignedProjects"), (snapshot) => {
-                            const projectsList = snapshot.docs.map(doc => ({
-                                ...doc.data(),
-                                docId: doc.id,
-                                uid: doc.ref.path.split('/')[1] // Safer way to get parent document ID from collectionGroup
-                            }));
-                            setAssignedProjects(projectsList);
-                            setActiveProjects(snapshot.size);
-                        });
-
-                        // Fetch other dashboard data once
-                        try {
-                            const usersSnapshot = await getDocs(collection(db, "users"));
-                            const usersList = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id }));
-
-                            // Sort users: Admin first, then by date descending
-                            const sortedUsers = usersList.sort((a: any, b: any) => {
-                                // Admin always on top
-                                if (a.role === 'admin' && b.role !== 'admin') return -1;
-                                if (a.role !== 'admin' && b.role === 'admin') return 1;
-
-                                // Then ascending by join date (oldest first)
-                                const dateA = a.createdAt?.seconds || 0;
-                                const dateB = b.createdAt?.seconds || 0;
-                                return dateA - dateB;
-                            });
-
-                            setAllUsers(sortedUsers);
-                            setTotalUsers(usersSnapshot.size);
-                        } catch (error) {
-                            console.error("Error fetching dashboard data:", error);
-                        }
                     }
-                } else {
-                    router.push("/login");
+                } catch (error) {
+                    console.error("Error fetching admin profile:", error);
                 }
+            } else {
+                router.push("/login");
+            }
+            setLoading(false);
+        });
+        return () => unsubscribe();
+    }, [router]);
+
+    // Data Fetching (Manual Refresh Strategy to save reads)
+    const refreshData = async () => {
+        if (!user) return;
+        setLoading(true);
+
+        try {
+            // 1. Fetch Settings
+            const settingsDoc = await getDoc(doc(db, "settings", "dashboard"));
+            if (settingsDoc.exists()) {
+                setSheetUrl(settingsDoc.data().sheetUrl || "");
+            }
+
+            // 2. Fetch Team Members
+            const teamSnapshot = await getDocs(collection(db, "team"));
+            const teamList = teamSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+            const sortedTeam = [...teamList].sort((a: any, b: any) => {
+                const dateA = new Date(a.joinedDate).getTime();
+                const dateB = new Date(b.joinedDate).getTime();
+                return dateA - dateB;
+            });
+            setTeamMembers(sortedTeam);
+
+            // 3. Fetch Active Tickets Count
+            // Optimization: Use count aggregation to avoid reading all documents just for a number
+            const openTicketsQuery = query(collection(db, "tickets"), where("status", "==", "open"));
+            const openTicketsSnap = await getCountFromServer(openTicketsQuery);
+            setTotalTickets(openTicketsSnap.data().count);
+
+            // 4. Fetch All Active Projects (Heavy Operation - converted to getDocs)
+            const projectsSnapshot = await getDocs(collectionGroup(db, "assignedProjects")); // Can limit this if needed, but admin likely needs full view
+            const projectsList = projectsSnapshot.docs.map(doc => ({
+                ...doc.data(),
+                docId: doc.id,
+                uid: doc.ref.path.split('/')[1]
+            }));
+            setAssignedProjects(projectsList);
+            setActiveProjects(projectsSnapshot.size);
+
+            // 5. Fetch Users
+            const usersSnapshot = await getDocs(collection(db, "users"));
+            const usersList = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id }));
+
+            const sortedUsers = usersList.sort((a: any, b: any) => {
+                if (a.role === 'admin' && b.role !== 'admin') return -1;
+                if (a.role !== 'admin' && b.role === 'admin') return 1;
+                const dateA = a.createdAt?.seconds || 0;
+                const dateB = b.createdAt?.seconds || 0;
+                return dateA - dateB;
             });
 
-            return unsubscribeAuth;
-        };
+            setAllUsers(sortedUsers);
+            setTotalUsers(usersSnapshot.size);
 
-        const authCleanupPromise = checkAuth();
+            setLastUpdated(new Date());
 
-        return () => {
-            authCleanupPromise.then(cleanup => cleanup && cleanup());
-            if (unsubscribeSettings) unsubscribeSettings();
-            if (unsubscribeTeam) unsubscribeTeam();
-            if (unsubscribeTickets) unsubscribeTickets();
-            if (unsubscribeProjects) unsubscribeProjects();
-        };
-    }, [router]);
+        } catch (error) {
+            console.error("Error refreshing dashboard data:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Initial Data Fetch when User is ready
+    useEffect(() => {
+        if (user) {
+            refreshData();
+        }
+    }, [user]);
 
     // Fetch pending payments from Google Sheet
     useEffect(() => {
@@ -1364,20 +1747,13 @@ export default function AdminDashboard() {
             case "projects": return <AdminProjects sheetUrl={sheetUrl} onUpdateUrl={handleUpdateSheetUrl} />;
             case "active-ids": return <AssignedProjectsSection projects={assignedProjects} users={allUsers} onDelete={handleDeleteProjectID} />;
             case "users": return <UsersSection users={allUsers} totalUsers={totalUsers} onDelete={handleDeleteUser} currentUserEmail={user?.email} />;
+            case "payments": return <AdminPaymentsSection projects={assignedProjects} />;
             case "support": return <AdminSupportSection />;
             case "settings":
                 if (!isSuperAdmin) {
                     return <div className="p-8 text-center text-red-500 font-bold">Access Denied: Super Admin Only</div>;
                 }
-                return (
-                    <div className="space-y-6">
-                        <TeamSection
-                            teamMembers={teamMembers}
-                            onAddMember={handleAddTeamMember}
-                            onDeleteMember={handleDeleteTeamMember}
-                        />
-                    </div>
-                );
+                return <FinanceSection assignedProjects={assignedProjects} teamMembers={teamMembers} onAddMember={handleAddTeamMember} onDeleteMember={handleDeleteTeamMember} />;
             default: return <div className="p-8 text-center text-slate-500">Section under construction</div>;
         }
     };
@@ -1406,12 +1782,21 @@ export default function AdminDashboard() {
                             <span className="font-medium">{item.label}</span>
                         </button>
                     ))}
+                    <hr className="my-4 border-slate-700/50" />
+                    <button
+                        onClick={refreshData}
+                        disabled={loading}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors disabled:opacity-50"
+                    >
+                        <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
+                        <span className="font-medium">{loading ? "Refreshing..." : "Refresh Data"}</span>
+                    </button>
                     <button
                         onClick={async () => {
                             localStorage.removeItem("adminActiveSection");
                             await signOut(auth);
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors mt-auto"
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"
                     >
                         <LogOut size={20} />
                         <span className="font-medium">Logout</span>
@@ -1439,12 +1824,14 @@ export default function AdminDashboard() {
             </div>
 
             {/* Overlay for mobile sidebar */}
-            {isSidebarOpen && (
-                <div
-                    className="fixed inset-0 bg-black/50 z-30 lg:hidden top-24 md:top-32"
-                    onClick={() => setIsSidebarOpen(false)}
-                ></div>
-            )}
-        </div>
+            {
+                isSidebarOpen && (
+                    <div
+                        className="fixed inset-0 bg-black/50 z-30 lg:hidden top-24 md:top-32"
+                        onClick={() => setIsSidebarOpen(false)}
+                    ></div>
+                )
+            }
+        </div >
     );
 }

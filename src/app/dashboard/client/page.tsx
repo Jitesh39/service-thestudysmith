@@ -357,12 +357,7 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
                 setIsAdding(false);
                 handleSyncData(true);
             } else {
-                setError("No project found with this ID and your email.");
-                setTimeout(() => {
-                    setError(null);
-                    setProjectIdInput("");
-                    setIsAdding(false);
-                }, 3000);
+                setError("No project found with this ID and your email. Please check and try again.");
             }
         } catch (err: any) {
             setError(err.message || "Failed to add project.");
@@ -886,63 +881,82 @@ export default function ClientDashboard() {
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
-    // Fetch user's tickets based on Email ID
+    // Auth State Observer
     useEffect(() => {
-        if (!user?.email) return;
+        const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+            if (currentUser) {
+                if (!currentUser.emailVerified) {
+                    router.push("/login");
+                    return;
+                }
 
-        const q = query(
-            collection(db, "tickets"),
-            where("userEmail", "==", user.email)
-        );
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const ticketList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-            ticketList.sort((a, b) => {
-                const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
-                const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
-                return dateB - dateA;
-            });
-            setTickets(ticketList);
-        });
-        return () => unsubscribe();
-    }, [user?.email]);
-
-    useEffect(() => {
-        const checkAuth = async () => {
-            const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
-                if (currentUser) {
-                    if (!currentUser.emailVerified) {
-                        router.push("/login");
-                        return;
-                    }
+                // Fetch user details once
+                try {
                     const userDoc = await getDoc(doc(db, "users", currentUser.uid));
                     const userData = userDoc.data();
 
-                    if (userData?.role !== "admin") {
-                        setUser({ ...currentUser, ...userData });
-                        setLoading(false);
-
-                        const q = query(collection(db, "users", currentUser.uid, "assignedProjects"));
-                        const unsubscribeProjects = onSnapshot(q, (snapshot) => {
-                            const projectsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                            setProjects(projectsList);
-                        });
-
-                        return () => unsubscribeProjects();
-                    } else {
+                    if (userData?.role === "admin") {
                         router.push("/dashboard/admin");
+                    } else {
+                        setUser({ ...currentUser, ...userData });
                     }
-                } else {
-                    router.push("/login");
+                } catch (error) {
+                    console.error("Error fetching user profile:", error);
                 }
-            });
-            return () => unsubscribe();
-        };
-        const cleanupPromise = checkAuth();
-        return () => {
-            cleanupPromise.then(cleanup => cleanup && cleanup());
-        };
+            } else {
+                router.push("/login");
+            }
+            setLoading(false);
+        });
+        return () => unsubscribe();
     }, [router]);
+
+    // Fetch Projects (Real-time: Important for status updates)
+    useEffect(() => {
+        if (!user?.uid) return;
+
+        // Limit query if possible, currently fetching all assigned projects
+        const q = query(collection(db, "users", user.uid, "assignedProjects"));
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const projectsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setProjects(projectsList);
+        }, (error) => {
+            console.error("Projects Real-time Error:", error);
+        });
+
+        return () => unsubscribe();
+    }, [user?.uid]);
+
+    // Fetch Tickets (One-time Fetch: Reduces reads)
+    // Users rarely need real-time updates for ticket lists unless actively chatting
+    useEffect(() => {
+        if (!user?.email) return;
+
+        const fetchTickets = async () => {
+            try {
+                const q = query(
+                    collection(db, "tickets"),
+                    where("userEmail", "==", user.email)
+                );
+                const snapshot = await getDocs(q);
+                const ticketList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+
+                // Sort client-side to avoid complex index requirements if not needed
+                ticketList.sort((a, b) => {
+                    const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
+                    const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
+                    return dateB - dateA;
+                });
+
+                setTickets(ticketList);
+            } catch (error) {
+                console.error("Error fetching tickets:", error);
+            }
+        };
+
+        fetchTickets();
+    }, [user?.email]);
 
     const menuItems = [
         { id: "overview", label: "Overview", icon: LayoutDashboard },
