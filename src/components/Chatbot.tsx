@@ -20,7 +20,7 @@ type ChatMessage = {
     formType?: "inquiry" | "callback";
 };
 
-export default function Chatbot() {
+export default function ChatBot() {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<ChatMessage[]>([
         {

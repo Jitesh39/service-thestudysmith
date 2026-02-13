@@ -895,7 +895,7 @@ export default function ClientDashboard() {
                     const userDoc = await getDoc(doc(db, "users", currentUser.uid));
                     const userData = userDoc.data();
 
-                    if (userData?.role === "admin") {
+                    if (userData?.role === "admin" || userData?.role === "Team_Member") {
                         router.push("/dashboard/admin");
                     } else {
                         setUser({ ...currentUser, ...userData });

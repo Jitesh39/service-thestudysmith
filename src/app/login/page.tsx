@@ -29,6 +29,8 @@ export default function LoginPage() {
             const userDocRef = doc(db, "users", user.uid);
             const userDoc = await getDoc(userDocRef);
 
+            let role = "client";
+
             if (!userDoc.exists()) {
                 // Create new user document
                 await setDoc(userDocRef, {
@@ -39,13 +41,17 @@ export default function LoginPage() {
                     role: "client",
                     createdAt: serverTimestamp(),
                 });
-                router.push("/dashboard/client");
-                // Reset dashboard view to overview on fresh login
-                localStorage.removeItem("clientActiveSection");
-                localStorage.removeItem("adminActiveSection");
+            } else {
+                role = userDoc.data()?.role || "client";
+            }
 
-                const userData = userDoc.data();
-                const role = userData?.role || "client";
+            // Reset dashboard view to overview on fresh login
+            localStorage.removeItem("clientActiveSection");
+            localStorage.removeItem("adminActiveSection");
+
+            if (role === "admin" || role === "Team_Member") {
+                router.push("/dashboard/admin");
+            } else {
                 router.push(`/dashboard/${role}`);
             }
         } catch (err: any) {
@@ -102,7 +108,11 @@ export default function LoginPage() {
             localStorage.removeItem("clientActiveSection");
             localStorage.removeItem("adminActiveSection");
 
-            router.push(`/dashboard/${role}`);
+            if (role === "admin" || role === "Team_Member") {
+                router.push("/dashboard/admin");
+            } else {
+                router.push(`/dashboard/${role}`);
+            }
 
         } catch (err: any) {
             console.error("Login error:", err);

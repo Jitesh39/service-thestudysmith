@@ -48,7 +48,8 @@ import {
     Briefcase,
     Calendar,
     Eye,
-    EyeOff
+    EyeOff,
+    Bell
 } from "lucide-react";
 import React, { useState, useEffect } from "react";
 
@@ -348,6 +349,7 @@ const TeamSection = ({ teamMembers, onAddMember, onDeleteMember, hideHeader = fa
     const [newMember, setNewMember] = useState({
         name: "",
         email: "",
+        role: "Team_Member",
         designation: "",
         joinedDate: new Date().toISOString().split('T')[0],
         pic: ""
@@ -388,6 +390,7 @@ const TeamSection = ({ teamMembers, onAddMember, onDeleteMember, hideHeader = fa
         setNewMember({
             name: "",
             email: "",
+            role: "Team_Member",
             designation: "",
             joinedDate: new Date().toISOString().split('T')[0],
             pic: ""
@@ -437,6 +440,17 @@ const TeamSection = ({ teamMembers, onAddMember, onDeleteMember, hideHeader = fa
                                 onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
                                 className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm"
                             />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Role</label>
+                            <select
+                                value={newMember.role}
+                                onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm"
+                            >
+                                <option value="Team_Member">Team Member</option>
+                                <option value="Admin">Admin</option>
+                            </select>
                         </div>
                         <div className="space-y-1">
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Designation</label>
@@ -526,9 +540,12 @@ const TeamSection = ({ teamMembers, onAddMember, onDeleteMember, hideHeader = fa
                                                     </div>
                                                 )}
                                             </div>
-                                            <div>
+                                            <div className="flex flex-col items-start gap-0.5">
                                                 <p className="font-bold text-slate-700 leading-none">{member.name}</p>
-                                                <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-tight">{member.email}</p>
+                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide ${member.role === 'Admin' ? 'bg-purple-100 text-purple-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                                                    {member.role || 'Team_Member'}
+                                                </span>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{member.email}</p>
                                             </div>
                                         </div>
                                     </td>
@@ -590,8 +607,11 @@ const TeamSection = ({ teamMembers, onAddMember, onDeleteMember, hideHeader = fa
                                             </div>
                                         )}
                                     </div>
-                                    <div>
-                                        <p className="font-bold text-slate-800">{member.name}</p>
+                                    <div className="flex flex-col items-start gap-1">
+                                        <p className="font-bold text-slate-800 leading-none">{member.name}</p>
+                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide ${member.role === 'Admin' ? 'bg-purple-100 text-purple-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                                            {member.role || 'Team_Member'}
+                                        </span>
                                         <p className="text-xs text-slate-500">{member.designation}</p>
                                     </div>
                                 </div>
@@ -630,7 +650,9 @@ const TeamSection = ({ teamMembers, onAddMember, onDeleteMember, hideHeader = fa
 
 const ProfileSection = ({ user, loading, teamMembers }: { user: any; loading: boolean, teamMembers: any[] }) => {
     const teamMember = teamMembers.find(member => member.email === user?.email);
-    const adminDesignation = teamMember?.designation || "Administrator";
+    const adminDesignation = teamMember?.designation || (user?.role === 'admin' ? "Administrator" : "Team Member");
+    const rawRole = teamMember?.role || user?.role || "Team Member";
+    const adminRole = rawRole.replace(/_/g, " ");
     const adminPic = teamMember?.pic;
 
     if (loading) {
@@ -658,7 +680,7 @@ const ProfileSection = ({ user, loading, teamMembers }: { user: any; loading: bo
 
     return (
         <div className="h-full bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-100">
-            <h2 className="text-xl md:text-2xl font-bold text-slate-800 mb-6 border-b border-slate-50 pb-4">Admin Profile</h2>
+            <h2 className="text-xl md:text-2xl font-bold text-slate-800 mb-6 border-b border-slate-50 pb-4 pl-3">Profile Section</h2>
             <div className="space-y-8">
                 <div className="flex flex-col sm:flex-row items-center gap-5 pb-8 border-b border-slate-50">
                     <div className="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center text-white text-4xl font-bold shadow-xl border-4 border-white overflow-hidden">
@@ -670,24 +692,28 @@ const ProfileSection = ({ user, loading, teamMembers }: { user: any; loading: bo
                     </div>
                     <div className="text-center sm:text-left space-y-1">
                         <h3 className="text-2xl font-bold text-slate-900 leading-tight">{user?.displayName || 'Admin Account'}</h3>
-                        <p className="text-slate-500 font-medium text-sm md:text-base">{user?.email}</p>
+                        <p className="text-slate-500 font-bold text-sm tracking-wide">{adminRole}</p>
                         <span className="inline-block mt-3 px-4 py-1.5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm">
                             {adminDesignation}
                         </span>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-8">
-                    <div className="space-y-2">
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Full Name</label>
-                        <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-slate-700 font-bold text-lg shadow-sm ring-1 ring-slate-200/50">
-                            {user?.displayName || 'Not Set'}
-                        </div>
-                    </div>
+                <div className="grid grid-cols-1 gap-6">
                     <div className="space-y-2">
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Email Address</label>
                         <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-slate-700 font-bold text-lg shadow-sm ring-1 ring-slate-200/50">
                             {user?.email || 'Not Set'}
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Joined Date</label>
+                        <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-slate-700 font-bold text-lg shadow-sm ring-1 ring-slate-200/50">
+                            {teamMember?.joinedDate ? new Date(teamMember.joinedDate).toLocaleDateString('en-GB', {
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric'
+                            }) : 'N/A'}
                         </div>
                     </div>
                 </div>
@@ -1141,7 +1167,8 @@ const UsersSection = ({ users, totalUsers, onDelete, currentUserEmail }: { users
                                             </td>
                                         )}
                                         <td className="p-4">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' :
+                                                u.role === 'Team_Member' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>
                                                 {u.role || 'client'}
                                             </span>
                                         </td>
@@ -1553,10 +1580,132 @@ const FinanceSection = ({ assignedProjects, isSuperAdmin, user }: { assignedProj
                     </table>
                 </div>
             </div>
-
         </div>
     );
 };
+
+const TeamMessagesSection = ({ user }: { user: any }) => {
+    const [messages, setMessages] = useState<any[]>([]);
+    const [newMessage, setNewMessage] = useState("");
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        const q = query(collection(db, "team_messages"), orderBy("createdAt", "desc"), limit(50));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const handlePostMessage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newMessage.trim()) return;
+
+        setLoading(true);
+        try {
+            await addDoc(collection(db, "team_messages"), {
+                content: newMessage,
+                senderName: user.displayName || user.email,
+                senderEmail: user.email,
+                senderRole: user.role || "Team_Member",
+                createdAt: serverTimestamp()
+            });
+            setNewMessage("");
+        } catch (error) {
+            console.error("Error posting message:", error);
+            alert("Failed to post message");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDeleteMessage = async (messageId: string) => {
+        if (!confirm("Are you sure you want to delete this message?")) return;
+        try {
+            await deleteDoc(doc(db, "team_messages", messageId));
+        } catch (error) {
+            console.error("Error deleting message:", error);
+            alert("Failed to delete message");
+        }
+    };
+
+    return (
+        <div className="max-w-4xl space-y-6 pb-10">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h2 className="text-2xl font-bold text-slate-800 mb-2">Team Updates</h2>
+                <p className="text-slate-500 mb-6 font-medium text-sm">Share important notices and updates with the team.</p>
+
+                <form onSubmit={handlePostMessage} className="relative">
+                    <textarea
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        placeholder="Type your update here..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 min-h-[100px] focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none text-slate-700 placeholder:text-slate-400 font-medium"
+                    />
+                    <div className="mt-3 flex justify-end">
+                        <button
+                            type="submit"
+                            disabled={loading || !newMessage.trim()}
+                            className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 disabled:opacity-50 transition-all shadow-lg shadow-blue-200 active:scale-95"
+                        >
+                            {loading ? "Posting..." : "Post Update"}
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div className="space-y-4">
+                {messages.length > 0 ? (
+                    messages.map((msg) => (
+                        <div key={msg.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <div className="flex-shrink-0">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md ${msg.senderRole === 'admin' || msg.senderRole === 'Admin' ? 'bg-purple-600' : 'bg-indigo-600'}`}>
+                                    {msg.senderName?.charAt(0).toUpperCase()}
+                                </div>
+                            </div>
+                            <div className="flex-1 space-y-1.5">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-bold text-slate-800">{msg.senderName}</span>
+                                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide whitespace-nowrap ${msg.senderRole === 'admin' || msg.senderRole === 'Admin' ? 'bg-purple-50 text-purple-700' : 'bg-indigo-50 text-indigo-700'}`}>
+                                            {msg.senderRole}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider whitespace-nowrap">
+                                            {msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleString() : 'Just now'}
+                                        </span>
+                                        {(user.role === "admin" || user.role === "Admin") && (
+                                            <button
+                                                onClick={() => handleDeleteMessage(msg.id)}
+                                                className="p-1 text-slate-400 hover:text-red-500 transition-colors"
+                                                title="Delete Message"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                                <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap font-medium">{msg.content}</p>
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-200 text-center">
+                        <Bell className="mx-auto text-slate-200 mb-3" size={40} />
+                        <p className="text-slate-400 font-bold">No updates yet.</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+
+
+
+
+
 
 export default function AdminDashboard() {
     const [activeSection, setActiveSection] = useState<string>("");
@@ -1601,7 +1750,7 @@ export default function AdminDashboard() {
                     const userDoc = await getDoc(doc(db, "users", currentUser.uid));
                     const userData = userDoc.data();
 
-                    if (userData?.role !== "admin") {
+                    if (userData?.role !== "admin" && userData?.role !== "Team_Member") {
                         router.push("/dashboard/client");
                     } else {
                         setUser({ ...currentUser, ...userData });
@@ -1664,8 +1813,10 @@ export default function AdminDashboard() {
             const usersList = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id }));
 
             const sortedUsers = usersList.sort((a: any, b: any) => {
-                if (a.role === 'admin' && b.role !== 'admin') return -1;
-                if (a.role !== 'admin' && b.role === 'admin') return 1;
+                const isAdminA = a.role === 'admin' || a.role === 'Team_Member';
+                const isAdminB = b.role === 'admin' || b.role === 'Team_Member';
+                if (isAdminA && !isAdminB) return -1;
+                if (!isAdminA && isAdminB) return 1;
                 const dateA = a.createdAt?.seconds || 0;
                 const dateB = b.createdAt?.seconds || 0;
                 return dateA - dateB;
@@ -1790,9 +1941,10 @@ export default function AdminDashboard() {
 
     const menuItems = [
         { id: "overview", label: "Dashboard", icon: LayoutDashboard },
+        { id: "team-updates", label: "Team Updates", icon: Bell },
         { id: "projects", label: "Projects Tracker", icon: Briefcase },
         { id: "active-ids", label: "Active Client Projects", icon: Package },
-        { id: "users", label: "Users", icon: Users },
+        ...(user?.role === 'Team_Member' ? [] : [{ id: "users", label: "Users", icon: Users }]),
         { id: "payments", label: "Payments", icon: CreditCard },
         { id: "support", label: "Support Tickets", icon: MessageSquare },
         { id: "finance", label: "Financial Overview", icon: TrendingUp },
@@ -1803,12 +1955,28 @@ export default function AdminDashboard() {
 
     const handleAddTeamMember = async (member: any) => {
         try {
+            // 1. Add to Team Collection
             const teamRef = collection(db, "team");
             await setDoc(doc(teamRef), {
                 ...member,
                 createdAt: new Date()
             });
-            alert("Team member added successfully!");
+
+            // 2. Sync Role with Users Collection (for Access Control)
+            if (member.email) {
+                const q = query(collection(db, "users"), where("email", "==", member.email));
+                const querySnapshot = await getDocs(q);
+
+                if (!querySnapshot.empty) {
+                    const userDoc = querySnapshot.docs[0];
+                    await setDoc(doc(db, "users", userDoc.id), {
+                        role: member.role || "Team_Member"
+                    }, { merge: true });
+                    console.log(`Updated role for user ${member.email} to ${member.role || "Team_Member"}`);
+                }
+            }
+
+            alert("Team member added and access permissions updated successfully!");
         } catch (error) {
             console.error("Error adding team member:", error);
             alert("Failed to add team member.");
@@ -1886,7 +2054,10 @@ export default function AdminDashboard() {
             );
             case "projects": return <AdminProjects sheetUrl={sheetUrl} onUpdateUrl={handleUpdateSheetUrl} isSuperAdmin={isSuperAdmin} />;
             case "active-ids": return <AssignedProjectsSection projects={assignedProjects} users={allUsers} onDelete={handleDeleteProjectID} isSuperAdmin={isSuperAdmin} />;
-            case "users": return <UsersSection users={allUsers} totalUsers={totalUsers} onDelete={handleDeleteUser} currentUserEmail={user?.email} />;
+            case "team-updates": return <TeamMessagesSection user={user} />;
+            case "users":
+                if (user?.role === 'Team_Member') return <div className="p-8 text-center text-red-500 font-bold">Access Denied: Admin Only</div>;
+                return <UsersSection users={allUsers} totalUsers={totalUsers} onDelete={handleDeleteUser} currentUserEmail={user?.email} />;
             case "payments": return <AdminPaymentsSection projects={assignedProjects} />;
             case "support": return <AdminSupportSection />;
             case "finance":

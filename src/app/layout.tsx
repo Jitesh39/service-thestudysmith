@@ -1,7 +1,9 @@
-import type { Metadata } from "next";
+"use client";
+
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Script from "next/script";
+import { usePathname } from "next/navigation";
 
 import ScrollToTop from "@/components/ScrollToTop";
 import WhatsAppButton from "@/components/WhatsAppButton";
@@ -17,16 +19,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Services - TheStudySmith",
-  description: "Complete static website projects for students. High-quality, original code with full documentation support.",
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const pathname = usePathname();
+  const isDashboard = pathname?.startsWith("/dashboard");
+
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
@@ -37,9 +37,13 @@ export default function RootLayout({
           strategy="afterInteractive"
         />
         {children}
-        <ScrollToTop />
-        <WhatsAppButton />
-        <Chatbot />
+        {!isDashboard && (
+          <>
+            <ScrollToTop />
+            <WhatsAppButton />
+            <Chatbot />
+          </>
+        )}
       </body>
     </html>
   );
