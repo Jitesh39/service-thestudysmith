@@ -945,6 +945,8 @@ const AssignedProjectsSection = ({ projects, users, onDelete, isSuperAdmin }: { 
         (p.projectStatus || p.status || "").toLowerCase() === "complete"
     ).length;
 
+    const activeCount = projects.length - totalDelivered;
+
     return (
         <div className="space-y-4">
             {/* Total Delivered Section */}
@@ -970,7 +972,7 @@ const AssignedProjectsSection = ({ projects, users, onDelete, isSuperAdmin }: { 
                             Active Client <span className="text-blue-600">Project</span>
                         </h2>
                         <span className="shrink-0 text-[10px] md:text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                            {projects.length}
+                            {activeCount}
                         </span>
                     </div>
                 </div>
@@ -1651,7 +1653,11 @@ export default function AdminDashboard() {
                 uid: doc.ref.path.split('/')[1]
             }));
             setAssignedProjects(projectsList);
-            setActiveProjects(projectsSnapshot.size);
+            const activeProjectsCount = projectsList.filter((p: any) => {
+                const status = (p.projectStatus || p.status || "").toLowerCase();
+                return status !== 'completed' && status !== 'complete';
+            }).length;
+            setActiveProjects(activeProjectsCount);
 
             // 5. Fetch Users
             const usersSnapshot = await getDocs(collection(db, "users"));
