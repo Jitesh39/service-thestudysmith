@@ -205,15 +205,22 @@ export default function LoginPage() {
                                             type="button"
                                             onClick={() => setShowPassword(!showPassword)}
                                             className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                                            suppressHydrationWarning
                                         >
                                             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                         </button>
                                     </div>
                                 </div>
+                                <div className="flex justify-end">
+                                    <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                                        Forgot Password?
+                                    </Link>
+                                </div>
 
                                 <button
                                     type="submit"
                                     disabled={loading}
+                                    suppressHydrationWarning
                                     className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg flex justify-center gap-2"
                                 >
                                     {loading ? "Signing in..." : <>Sign In <ArrowRight size={18} /></>}
@@ -230,6 +237,7 @@ export default function LoginPage() {
                                     type="button"
                                     onClick={handleGoogleSignIn}
                                     disabled={loading}
+                                    suppressHydrationWarning
                                     className="w-full bg-white border border-slate-300 text-slate-700 font-semibold py-2.5 rounded-lg hover:bg-slate-50 transition shadow-sm flex items-center justify-center gap-2 mb-6"
                                 >
                                     <svg className="w-5 h-5" viewBox="0 0 24 24">
