@@ -26,6 +26,8 @@ export default function RootLayout({
 }>) {
   const pathname = usePathname();
   const isDashboard = pathname?.startsWith("/dashboard");
+  const isBlogDetailed = pathname?.startsWith("/blog/");
+  const hideFloatingIcons = isDashboard || isBlogDetailed;
 
   return (
     <html lang="en">
@@ -37,7 +39,7 @@ export default function RootLayout({
           strategy="afterInteractive"
         />
         {children}
-        {!isDashboard && (
+        {!hideFloatingIcons && (
           <>
             <ScrollToTop />
             <WhatsAppButton />

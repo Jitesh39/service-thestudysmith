@@ -1077,8 +1077,10 @@ export default function ClientDashboard() {
 
                     if (docSnap.exists()) {
                         const userData = docSnap.data();
-                        if (userData?.role === "admin" || userData?.role === "Team_Member") {
+                        if (userData?.role === "admin") {
                             router.push("/dashboard/admin");
+                        } else if (userData?.role === "Team_Member") {
+                            router.push("/dashboard/team");
                         } else {
                             setUser({
                                 ...basicInfo,

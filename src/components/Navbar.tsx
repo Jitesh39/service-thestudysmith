@@ -93,6 +93,14 @@ export default function Navbar() {
         setIsMobileMenuOpen(false);
     };
 
+    const getDashboardHref = () => {
+        if (!userRole) return "/login";
+        // Map Team_Member and admin to respective routes
+        if (userRole === "admin") return "/dashboard/admin";
+        if (userRole === "Team_Member") return "/dashboard/team";
+        return `/dashboard/${userRole}`;
+    };
+
     // Determine Navbar Styles based on Active Section or Route
     const getNavbarStyles = () => {
         // If in dashboard or other pages, force solid background
@@ -173,7 +181,7 @@ export default function Navbar() {
                             {/* Show "Go to Dashboard" if not already on dashboard */}
                             {!pathname?.startsWith("/dashboard") && (
                                 <Link
-                                    href={`/dashboard/${userRole}`}
+                                    href={getDashboardHref()}
                                     className={cn(
                                         "inline-flex items-center gap-2 text-sm px-5 py-2.5 rounded-full shadow-md transition-all hover:scale-105",
                                         isDarkSection ? "bg-white text-blue-900 hover:bg-slate-100" : "bg-blue-600 text-white hover:bg-blue-700"
@@ -255,7 +263,7 @@ export default function Navbar() {
                         {user ? (
                             <>
                                 <Link
-                                    href={`/dashboard/${userRole}`}
+                                    href={getDashboardHref()}
                                     onClick={() => setIsMobileMenuOpen(false)}
                                     className="btn btn-primary text-center justify-center w-full py-2 rounded-xl flex items-center gap-2"
                                 >

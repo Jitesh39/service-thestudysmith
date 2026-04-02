@@ -2216,9 +2216,9 @@ export default function AdminDashboard() {
                     const userDoc = await getDoc(doc(db, "users", currentUser.uid));
                     const userData = userDoc.data();
 
-                    if (userData?.role === "Team_Member") {
-                        router.push("/dashboard/team");
-                    } else if (userData?.role !== "admin") {
+                    if (userData?.role === "admin") {
+                        router.push("/dashboard/admin");
+                    } else if (userData?.role !== "Team_Member") {
                         router.push("/dashboard/client");
                     } else {
                         setUser({ ...currentUser, ...userData });

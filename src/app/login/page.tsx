@@ -49,8 +49,10 @@ export default function LoginPage() {
             localStorage.removeItem("clientActiveSection");
             localStorage.removeItem("adminActiveSection");
 
-            if (role === "admin" || role === "Team_Member") {
+            if (role === "admin") {
                 router.push("/dashboard/admin");
+            } else if (role === "Team_Member") {
+                router.push("/dashboard/team");
             } else {
                 router.push(`/dashboard/${role}`);
             }
@@ -108,8 +110,10 @@ export default function LoginPage() {
             localStorage.removeItem("clientActiveSection");
             localStorage.removeItem("adminActiveSection");
 
-            if (role === "admin" || role === "Team_Member") {
+            if (role === "admin") {
                 router.push("/dashboard/admin");
+            } else if (role === "Team_Member") {
+                router.push("/dashboard/team");
             } else {
                 router.push(`/dashboard/${role}`);
             }

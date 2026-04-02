@@ -28,11 +28,11 @@ export default function SingleBlogPage() {
     useEffect(() => {
         const fetchBlog = async () => {
             if (!params?.id) return;
-            
+
             try {
                 const docRef = doc(db, "blogs", params.id as string);
                 const docSnap = await getDoc(docRef);
-                
+
                 if (docSnap.exists()) {
                     setBlog({ id: docSnap.id, ...docSnap.data() } as Blog);
                 } else {
@@ -78,7 +78,7 @@ export default function SingleBlogPage() {
     return (
         <div className="min-h-screen bg-white flex flex-col">
             <Navbar />
-            
+
             <main className="flex-1 pt-32 pb-24">
                 <article className="container max-w-4xl mx-auto px-4 sm:px-6">
                     {/* Back button */}
@@ -99,17 +99,17 @@ export default function SingleBlogPage() {
                                 {blog.createdAt?.toDate ? blog.createdAt.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Recently'}
                             </span>
                         </div>
-                        
-                        <h1 className="text-4xl md:text-6xl font-black text-slate-900 leading-[1.1] tracking-tight max-w-3xl mx-auto">
+
+                        <h1 className="text-2xl md:text-4xl font-black text-slate-900 leading-[1.2] tracking-tight max-w-3xl mx-auto">
                             {blog.title}
                         </h1>
                     </header>
 
                     {/* Featured Image */}
                     <div className="w-full h-[400px] md:h-[500px] rounded-[2.5rem] overflow-hidden mb-16 shadow-2xl relative">
-                        <img 
-                            src={blog.image} 
-                            alt={blog.title} 
+                        <img
+                            src={blog.image}
+                            alt={blog.title}
                             className="w-full h-full object-cover"
                         />
                         <div className="absolute inset-0 ring-1 ring-inset ring-black/10 rounded-[2.5rem]"></div>
@@ -126,15 +126,15 @@ export default function SingleBlogPage() {
                             ) : null
                         ))}
                     </div>
-                    
+
                     <div className="mt-16 pt-8 border-t border-slate-100 flex justify-center">
-                         <Link href="/blog" className="inline-flex items-center gap-2 bg-slate-900 text-white font-bold px-8 py-4 rounded-full hover:bg-black transition-colors shadow-xl shadow-slate-900/20">
-                             Explore More Articles
-                         </Link>
+                        <Link href="/blog" className="inline-flex items-center gap-2 bg-slate-900 text-white font-bold px-8 py-4 rounded-full hover:bg-black transition-colors shadow-xl shadow-slate-900/20">
+                            Explore More Articles
+                        </Link>
                     </div>
                 </article>
             </main>
-            
+
             <Footer />
         </div>
     );
