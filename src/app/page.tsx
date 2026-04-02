@@ -25,6 +25,7 @@ import Newsletter from "@/components/Newsletter";
 import InquiryForm from "@/components/InquiryForm";
 import TiltWrapper from "@/components/TiltWrapper";
 import { FadeUp, ScaleIn } from "@/components/MotionWrappers";
+import PublishedProjects from "@/components/PublishedProjects";
 
 export default function Home() {
   const faqs = [
@@ -105,66 +106,7 @@ export default function Home() {
             <p className="section-subtitle">Check out our latest projects to understand our quality and work standards.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-            {/* Demo Card 1 */}
-            <TiltWrapper>
-              <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-100 hover:shadow-xl transition-all duration-300 group h-full">
-                <div className="h-64 bg-slate-200 flex items-center justify-center relative overflow-hidden">
-                  <img
-                    src="project-demo/project-owl.png"
-                    alt="Project Owl"
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors duration-300"></div>
-                </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">Project Owl</h3>
-                  <p className="text-slate-600 text-sm mb-4 leading-relaxed">
-                    Project Owl is a sleek portfolio website designed to showcase a photography business, highlighting work, services, and creative vision professionally.                  </p>
-                </div>
-              </div>
-            </TiltWrapper>
-
-            {/* Demo Card 2 */}
-            <TiltWrapper>
-              <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-100 hover:shadow-xl transition-all duration-300 group h-full">
-                <div className="h-64 bg-slate-200 flex items-center justify-center relative overflow-hidden">
-                  <img
-                    src="project-demo/resumeforgeai.png"
-                    alt="Project Owl"
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-transform duration-300"></div>
-                  {/* <span className="relative text-white font-bold text-xl">Hospital Management</span> */}
-                </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">ResumeForgeAi</h3>
-                  <p className="text-slate-600 text-sm mb-4 leading-relaxed">
-                    A simple platform that offers ready-to-use resume templates to help you build a professional CV quickly and easily.                  </p>
-                </div>
-              </div>
-            </TiltWrapper>
-
-            {/* Demo Card 3 */}
-            <TiltWrapper>
-              <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-100 hover:shadow-xl transition-all duration-300 group h-full">
-                <div className="h-64 bg-slate-200 flex items-center justify-center relative overflow-hidden">
-                  <img
-                    src="project-demo/mylifeinfo.png"
-                    alt="Project Owl"
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-transform duration-300"></div>
-                  {/* <span className="relative text-white font-bold text-xl">AI Content Generator</span> */}
-                </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">MyLifeInfo - Vault</h3>
-                  <p className="text-slate-600 text-sm mb-4 leading-relaxed">
-                    A secure digital platform to store, organize, and share essential will and emergency information when it matters most.</p>
-                </div>
-              </div>
-            </TiltWrapper>
-          </div>
+          <PublishedProjects limitCount={3} />
 
           <div className="text-center">
             <Link href="/demo-projects" className="btn btn-primary px-8 py-3 rounded-full shadow-lg hover:shadow-xl transition-all">

@@ -3,27 +3,22 @@
 import Link from "next/link";
 import { useState } from "react";
 import Image from "next/image";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Clock } from "lucide-react";
+import { formatTimeAgo } from "@/lib/utils";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import TiltWrapper from "@/components/TiltWrapper";
 import { FadeUp } from "@/components/MotionWrappers";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useEffect } from "react";
 
 // Project Data - Add new projects here
 const projects = [
     {
-        title: "Project Owl",
-        // category: "Portfolio Website",
-        description: "A sleek portfolio website designed to showcase a photography business, highlighting work, services, and creative vision professionally.",
-        // technologies: ["React", "Tailwind CSS"],
-        image: "project-demo/project-owl.png",
-        theme: "blue",
-        demoUrl: "https://project-owl-one.vercel.app"
-    },
-    {
         title: "ResumeForge AI",
         description: "A simple platform that offers ready-to-use resume templates to help you build a professional CV quickly and easily.",
         image: "project-demo/resumeforgeai.png",
+        theme: "blue",
         demoUrl: "https://resumeforgeai-pi.vercel.app/"
     },
     {
@@ -66,7 +61,7 @@ const projects = [
 ];
 
 // Reusable Project Card Component - Memoized to prevent re-renders (optional but good practice)
-const ProjectCard = ({ project }: { project: typeof projects[0] }) => {
+const ProjectCard = ({ project, mounted }: { project: typeof projects[0], mounted: boolean }) => {
     // Dynamic styling based on theme
     const themeStyles = {
         blue: { gradient: "from-blue-500 to-indigo-600", pill: "bg-blue-50 text-blue-600" },
@@ -75,70 +70,87 @@ const ProjectCard = ({ project }: { project: typeof projects[0] }) => {
     }[project.theme as "blue" | "emerald" | "violet"] || { gradient: "from-blue-500 to-indigo-600", pill: "bg-blue-50 text-blue-600" };
 
     return (
-        <TiltWrapper>
-            <div className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md border border-slate-100 transition-all duration-300 group flex flex-col h-full">
-                <div className="h-64 bg-slate-100 flex items-center justify-center relative overflow-hidden shrink-0 group">
-                    {/* Image or Gradient Fallback */}
-                    {project.image ? (
-                        <>
-                            <img
-                                src={project.image}
-                                alt={project.title}
-                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                            />
-                            <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors duration-300"></div>
-                        </>
-                    ) : (
-                        <div className={`absolute inset-0 bg-gradient-to-br ${themeStyles.gradient} opacity-90 group-hover:scale-105 transition-transform duration-500`}></div>
-                    )}
+        <div className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md border border-slate-100 transition-all duration-300 group flex flex-col h-full">
+            <div className="h-64 bg-slate-100 flex items-center justify-center relative overflow-hidden shrink-0 group">
+                {/* Image or Gradient Fallback */}
+                {project.image ? (
+                    <>
+                        <img
+                            src={project.image}
+                            alt={project.title}
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors duration-300"></div>
+                    </>
+                ) : (
+                    <div className={`absolute inset-0 bg-gradient-to-br ${themeStyles.gradient} opacity-90 group-hover:scale-105 transition-transform duration-500`}></div>
+                )}
 
-                    {/* Category Badge overlay on image */}
-                    {/* <div className="absolute top-2 right-2">
-                        <span className="px-2 py-1 bg-white/90 backdrop-blur-sm text-slate-700 text-[10px] font-bold rounded-md shadow-sm border border-white/20">
-                            {project.category}
+                {/* Time Ago Badge */}
+                {mounted && (
+                    <div className="absolute top-4 right-4 bg-white/100 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-sm flex items-center gap-1.5 border border-white/20">
+                        <Clock size={12} className="text-blue-600" />
+                        <span className="text-[10px] font-black text-black-700 tracking-tight">
+                            {(project as any).createdAt ? formatTimeAgo((project as any).createdAt) : "Project"}
                         </span>
-                    </div> */}
-                </div>
-
-                <div className="p-4 flex flex-col flex-grow">
-                    {/* <div className="flex flex-wrap gap-1.5 mb-3">
-                        {project.technologies.map((tech, i) => (
-                            <span key={i} className={`px-2.5 py-0.5 ${themeStyles.pill} text-[10px] uppercase tracking-wide font-bold rounded-md`}>
-                                {tech}
-                            </span>
-                        ))}
-                    </div> */}
-                    <h3 className="text-lg font-bold text-slate-800 mb-1 leading-snug">{project.title}</h3>
-                    <p className="text-slate-500 text-xs mb-4 leading-relaxed flex-grow line-clamp-3">
-                        {project.description}
-                    </p>
-                    <a
-                        href={project.demoUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full py-3 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors shadow-sm mt-auto text-center block"
-                    >
-                        View Demo
-                    </a>
-                </div>
+                    </div>
+                )}
             </div>
-        </TiltWrapper>
+
+            <div className="p-4 flex flex-col flex-grow">
+                <h3 className="text-lg font-bold text-slate-800 mb-1 leading-snug">{project.title}</h3>
+                <p className="text-slate-500 text-xs mb-4 leading-relaxed flex-grow line-clamp-3">
+                    {project.description}
+                </p>
+                <a
+                    href={project.demoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors shadow-sm mt-auto text-center block"
+                >
+                    View Demo
+                </a>
+            </div>
+        </div>
     );
 };
 
 export default function DemoProjectsPage() {
     const [currentPage, setCurrentPage] = useState(1);
-    const projectsPerPage = 6; // 3 columns * 2 rows = 6 items
+    const [dbProjects, setDbProjects] = useState<any[]>([]);
+    const [mounted, setMounted] = useState(false);
+    const projectsPerPage = 6;
+
+    useEffect(() => {
+        setMounted(true);
+        const fetchDbProjects = async () => {
+            try {
+                const q = query(collection(db, "projects"), orderBy("createdAt", "desc"));
+                const snapshot = await getDocs(q);
+                const fetched = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                    demoUrl: (doc.data() as any).url || "#",
+                }));
+                setDbProjects(fetched);
+            } catch (error) {
+                console.error("Error fetching projects:", error);
+            }
+        };
+        fetchDbProjects();
+    }, []);
+
+    const allProjects = [...dbProjects, ...projects];
 
     // Calculate pagination data
     const indexOfLastProject = currentPage * projectsPerPage;
     const indexOfFirstProject = indexOfLastProject - projectsPerPage;
-    const currentProjects = projects.slice(indexOfFirstProject, indexOfLastProject);
-    const totalPages = Math.ceil(projects.length / projectsPerPage);
+    const currentProjects = allProjects.slice(indexOfFirstProject, indexOfLastProject);
+    const totalPages = Math.ceil(allProjects.length / projectsPerPage);
 
     const handlePageChange = (pageNumber: number) => {
         setCurrentPage(pageNumber);
-        window.scrollTo({ top: 300, behavior: 'smooth' }); // Scroll to grid top
+        window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll to very top
     };
 
     return (
@@ -161,7 +173,7 @@ export default function DemoProjectsPage() {
                             Sample <span className="text-blue-600">Static</span> Projects
                         </h1>
                         <p className="text-lg text-slate-600 max-w-2xl leading-relaxed">
-                            Explore our collection of projects. These demos showcase the quality, functionality, and documentation standards we deliver.
+                            Explore our collection of projects. These Projects showcase the quality, functionality, and documentation standards we deliver.
                         </p>
                     </div>
                 </FadeUp>
@@ -169,12 +181,12 @@ export default function DemoProjectsPage() {
                 {/* Projects Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 content-start min-h-[600px]">
                     {currentProjects.map((project, index) => (
-                        <ProjectCard key={index} project={project} />
+                        <ProjectCard key={index} project={project} mounted={mounted} />
                     ))}
                 </div>
 
                 {/* Pagination Controls */}
-                {totalPages > 1 && (
+                {mounted && totalPages > 1 && (
                     <div className="flex justify-center items-center mt-12 gap-2">
                         <button
                             onClick={() => handlePageChange(currentPage - 1)}
@@ -192,6 +204,7 @@ export default function DemoProjectsPage() {
                                 <button
                                     key={number}
                                     onClick={() => handlePageChange(number)}
+                                    suppressHydrationWarning={true}
                                     className={`w-10 h-10 rounded-lg text-sm font-bold transition-all ${currentPage === number
                                         ? "bg-blue-600 text-white shadow-md"
                                         : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"

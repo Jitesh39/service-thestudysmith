@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
@@ -23,8 +23,29 @@ import {
     Search,
     Loader2,
     RefreshCw,
-    Send
+    Send,
+    Pencil,
+    Camera
 } from "lucide-react";
+
+const uploadToCloudinary = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "thestudysmith_profile");
+    formData.append("folder", "thestudysmith/profile");
+
+    try {
+        const response = await fetch(`https://api.cloudinary.com/v1_1/db0vcogoj/image/upload`, {
+            method: "POST",
+            body: formData,
+        });
+        const data = await response.json();
+        return data.secure_url;
+    } catch (error) {
+        console.error("Cloudinary upload error:", error);
+        throw error;
+    }
+};
 
 // Helper to get time-based greeting
 const getTimeGreeting = () => {
@@ -107,8 +128,12 @@ const OverviewSection = ({ user, projects, tickets, loading }: { user: any; proj
                 ) : (
                     <div className="max-w-md bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                         <div className="flex items-center gap-5">
-                            <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-white text-2xl font-bold shadow-inner shrink-0">
-                                {user?.displayName ? user.displayName.charAt(0).toUpperCase() : (user?.email ? user.email.charAt(0).toUpperCase() : 'U')}
+                            <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-white text-2xl font-bold shadow-inner shrink-0 overflow-hidden">
+                                {user?.profileImage || user?.photoURL ? (
+                                    <img src={user.profileImage || user.photoURL} alt={user.displayName || user.name} className="w-full h-full object-cover" />
+                                ) : (
+                                    user?.displayName || user?.name ? (user.displayName || user.name).charAt(0).toUpperCase() : (user?.email ? user.email.charAt(0).toUpperCase() : 'U')
+                                )}
                             </div>
                             <div className="min-w-0">
                                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-0.5">Logged in as</p>
@@ -525,17 +550,6 @@ const NotificationsSection = () => {
                 </div>
             </div>
 
-            {/* Latest Updates Card */}
-            {/* <div className="bg-blue-600 rounded-2xl p-6 text-white shadow-xl shadow-blue-100 flex items-center gap-6">
-                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
-                    <Bell size={24} className="animate-bounce" />
-                </div>
-                <div>
-                    <h4 className="font-bold text-lg">Platform Update: Profile Integration</h4>
-                    <p className="text-blue-100 text-sm font-medium">We've moved your Profile details directly into the Overview section for easier access. You can now view your account details as soon as you log in!</p>
-                </div>
-            </div> */}
-
             <div className="space-y-6">
                 <h3 className="text-xl font-bold text-slate-800 px-2 flex items-center gap-2">
                     <LayoutDashboard size={20} className="text-blue-600" />
@@ -860,6 +874,168 @@ const SupportSection = ({ user, tickets }: { user: any; tickets: any[] }) => {
     );
 };
 
+const ProfileSection = ({ user, loading }: { user: any; loading: boolean }) => {
+    const [isUploading, setIsUploading] = useState(false);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const showToast = (message: string, type: 'success' | 'error') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+    };
+
+    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Show preview immediately
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setPreviewUrl(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+
+        setIsUploading(true);
+        try {
+            const url = await uploadToCloudinary(file);
+            await setDoc(doc(db, "users", user.uid), {
+                profileImage: url,
+                name: user.displayName || user.name || "Client Account",
+                email: user.email
+            }, { merge: true });
+            showToast("Profile image updated successfully!", "success");
+            setPreviewUrl(null); // Clear preview as Firestore will update the actual image
+        } catch (error) {
+            console.error("Error uploading photo:", error);
+            showToast("Failed to upload image. Please try again.", "error");
+            setPreviewUrl(null);
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="max-w-2xl bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-100 animate-pulse">
+                <div className="h-8 w-48 bg-slate-200 rounded mb-6"></div>
+                <div className="flex flex-col sm:flex-row items-center gap-4 mb-8">
+                    <div className="w-20 h-20 rounded-full bg-slate-200"></div>
+                    <div className="space-y-2 text-center sm:text-left">
+                        <div className="h-5 w-32 bg-slate-200 rounded mx-auto sm:mx-0"></div>
+                        <div className="h-4 w-48 bg-slate-200 rounded mx-auto sm:mx-0"></div>
+                    </div>
+                </div>
+                <div className="space-y-6">
+                    {[1, 2].map((i) => (
+                        <div key={i} className="space-y-2">
+                            <div className="h-4 w-24 bg-slate-200 rounded mx-auto sm:mx-0"></div>
+                            <div className="h-10 w-full bg-slate-100 rounded"></div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="max-w-2xl bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10 relative">
+            {toast && (
+                <div className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 px-6 py-4 rounded-2xl shadow-2xl animate-in zoom-in duration-300 flex items-center gap-3 font-bold ${toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                    }`}>
+                    {toast.type === 'success' ? '✓' : '✕'}
+                    {toast.message}
+                </div>
+            )}
+
+            <div className="flex justify-between items-center mb-8 pb-4 border-b border-slate-50">
+                <h2 className="text-2xl md:text-3xl font-black text-slate-900 flex items-center gap-3">
+                    <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                        <User size={24} />
+                    </div>
+                    Account Profile
+                </h2>
+
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                />
+                <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="p-2 bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl border border-slate-200 transition-all active:scale-95 disabled:opacity-50"
+                    title="Change Profile Photo"
+                >
+                    {isUploading ? <RefreshCw size={20} className="animate-spin" /> : <Pencil size={20} />}
+                </button>
+            </div>
+
+            <div className="space-y-8">
+                <div className="flex flex-col sm:flex-row items-center gap-6 pb-8 border-b border-slate-50">
+                    <div className="relative group">
+                        <div className="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center text-white text-3xl font-bold shadow-2xl border-4 border-white overflow-hidden shrink-0">
+                            {previewUrl || user?.profileImage || user?.photoURL ? (
+                                <img src={previewUrl || user.profileImage || user.photoURL} alt={user.displayName || user.name} className="w-full h-full object-cover" />
+                            ) : (
+                                user?.displayName || user?.name ? (user.displayName || user.name).charAt(0).toUpperCase() : (user?.email ? user.email.charAt(0).toUpperCase() : 'U')
+                            )}
+                            {isUploading && (
+                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                    <RefreshCw className="text-white animate-spin" size={24} />
+                                </div>
+                            )}
+                        </div>
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isUploading}
+                            className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-full flex items-center justify-center text-white disabled:pointer-events-none"
+                        >
+                            <Camera size={20} />
+                        </button>
+                    </div>
+                    <div className="text-center sm:text-left space-y-1">
+                        <h3 className="text-2xl font-black text-slate-900 leading-tight">{user?.displayName || user?.name || 'Client Account'}</h3>
+                        <div className="flex flex-wrap items-center gap-2 mt-1 justify-center sm:justify-start">
+                            <span className="px-3 py-1 bg-slate-50 text-slate-500 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm border border-slate-100">
+                                Verified Portal Access
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Full Name</label>
+                        <div className="w-full bg-slate-50/50 border border-slate-200 rounded-2xl px-5 py-4 text-slate-700 font-bold text-base shadow-sm ring-1 ring-slate-200/30 capitalize">
+                            {user?.displayName || user?.name || 'Not Set'}
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Email Address</label>
+                        <div className="w-full bg-slate-50/50 border border-slate-200 rounded-2xl px-5 py-4 text-slate-700 font-bold text-base shadow-sm ring-1 ring-slate-200/30">
+                            {user?.email || 'Not Available'}
+                        </div>
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Account Created On</label>
+                        <div className="w-full bg-slate-50/50 border border-slate-200 rounded-2xl px-5 py-4 text-slate-700 font-bold text-base shadow-sm ring-1 ring-slate-200/30">
+                            {user?.createdAt ? new Date(user.createdAt.seconds * 1000).toLocaleDateString('en-GB', {
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric'
+                            }) : 'Syncing Data...'}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
 export default function ClientDashboard() {
     const [activeSection, setActiveSection] = useState<string>("");
 
@@ -890,19 +1066,36 @@ export default function ClientDashboard() {
                     return;
                 }
 
-                // Fetch user details once
-                try {
-                    const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-                    const userData = userDoc.data();
+                // Fetch user details once, then listen for real-time updates
+                const userDocRef = doc(db, "users", currentUser.uid);
+                const unsubscribeUser = onSnapshot(userDocRef, (docSnap) => {
+                    const basicInfo = {
+                        uid: currentUser.uid,
+                        email: currentUser.email,
+                        displayName: currentUser.displayName,
+                    };
 
-                    if (userData?.role === "admin" || userData?.role === "Team_Member") {
-                        router.push("/dashboard/admin");
+                    if (docSnap.exists()) {
+                        const userData = docSnap.data();
+                        if (userData?.role === "admin" || userData?.role === "Team_Member") {
+                            router.push("/dashboard/admin");
+                        } else {
+                            setUser({
+                                ...basicInfo,
+                                ...userData
+                            });
+                        }
                     } else {
-                        setUser({ ...currentUser, ...userData });
+                        // For first time users, still show basic auth info
+                        setUser(basicInfo);
                     }
-                } catch (error) {
-                    console.error("Error fetching user profile:", error);
-                }
+                    setLoading(false);
+                }, (error) => {
+                    console.error("Error listening to user profile:", error);
+                    setLoading(false);
+                });
+
+                return () => unsubscribeUser();
             } else {
                 router.push("/login");
             }
@@ -960,6 +1153,7 @@ export default function ClientDashboard() {
 
     const menuItems = [
         { id: "overview", label: "Overview", icon: LayoutDashboard },
+        { id: "profile", label: "My Profile", icon: User },
         { id: "projects", label: "My Projects", icon: Package },
         { id: "payments", label: "Payments", icon: CreditCard },
         { id: "documents", label: "Documents", icon: FileText },
@@ -970,6 +1164,7 @@ export default function ClientDashboard() {
     const renderContent = () => {
         switch (activeSection) {
             case "overview": return <OverviewSection user={user} projects={projects} tickets={tickets} loading={loading} />;
+            case "profile": return <ProfileSection user={user} loading={loading} />;
             case "projects": return <ProjectsSection user={user} loading={loading} projects={projects} />;
             case "payments": return <PaymentsSection projects={projects} />;
             case "documents": return <DocumentsSection />;

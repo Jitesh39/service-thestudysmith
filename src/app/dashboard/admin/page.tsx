@@ -49,7 +49,9 @@ import {
     Calendar,
     Eye,
     EyeOff,
-    Bell
+    Bell,
+    Send,
+    Pencil,
 } from "lucide-react";
 import React, { useState, useEffect } from "react";
 
@@ -80,6 +82,7 @@ const AdminOverview = ({
     pendingPayments,
     totalTickets,
     teamMembers,
+    allUsers = [],
     onAddMember,
     onDeleteMember
 }: {
@@ -90,6 +93,7 @@ const AdminOverview = ({
     pendingPayments: number;
     totalTickets: number;
     teamMembers: any[];
+    allUsers?: any[];
     onAddMember: (member: any) => void;
     onDeleteMember: (id: string) => void;
 }) => (
@@ -144,6 +148,7 @@ const AdminOverview = ({
 
         <TeamSection
             teamMembers={teamMembers}
+            allUsers={allUsers}
             onAddMember={onAddMember}
             onDeleteMember={onDeleteMember}
             hideHeader={true}
@@ -344,7 +349,12 @@ const AdminSupportSection = () => {
     );
 };
 
-const TeamSection = ({ teamMembers, onAddMember, onDeleteMember, hideHeader = false, isDashboard = false }: { teamMembers: any[], onAddMember: (member: any) => void, onDeleteMember: (id: string) => void, hideHeader?: boolean, isDashboard?: boolean }) => {
+const TeamSection = ({ teamMembers, onAddMember, onDeleteMember, hideHeader = false, isDashboard = false, allUsers = [] }: { teamMembers: any[], onAddMember: (member: any) => void, onDeleteMember: (id: string) => void, hideHeader?: boolean, isDashboard?: boolean, allUsers?: any[] }) => {
+    const getTeamMemberPic = (member: any) => {
+        if (member.pic) return member.pic;
+        const matchingUser = allUsers.find(u => u.email === member.email);
+        return matchingUser?.profileImage || matchingUser?.photoURL || null;
+    };
     const [isAdding, setIsAdding] = useState(false);
     const [newMember, setNewMember] = useState({
         name: "",
@@ -532,8 +542,8 @@ const TeamSection = ({ teamMembers, onAddMember, onDeleteMember, hideHeader = fa
                                     <td className="p-4">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-full bg-blue-100 overflow-hidden border-2 border-white shadow-sm flex-shrink-0">
-                                                {member.pic ? (
-                                                    <img src={member.pic} alt={member.name} className="w-full h-full object-cover" />
+                                                {getTeamMemberPic(member) ? (
+                                                    <img src={getTeamMemberPic(member)} alt={member.name} className="w-full h-full object-cover" />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center text-blue-600 font-bold text-sm bg-blue-50">
                                                         {member.name.charAt(0)}
@@ -599,8 +609,8 @@ const TeamSection = ({ teamMembers, onAddMember, onDeleteMember, hideHeader = fa
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <div className="w-12 h-12 rounded-full bg-blue-100 overflow-hidden border-2 border-white shadow-sm flex-shrink-0">
-                                        {member.pic ? (
-                                            <img src={member.pic} alt={member.name} className="w-full h-full object-cover" />
+                                        {getTeamMemberPic(member) ? (
+                                            <img src={getTeamMemberPic(member)} alt={member.name} className="w-full h-full object-cover" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-blue-600 font-bold text-lg bg-blue-50">
                                                 {member.name.charAt(0)}
@@ -653,7 +663,7 @@ const ProfileSection = ({ user, loading, teamMembers }: { user: any; loading: bo
     const adminDesignation = teamMember?.designation || (user?.role === 'admin' ? "Administrator" : "Team Member");
     const rawRole = teamMember?.role || user?.role || "Team Member";
     const adminRole = rawRole.replace(/_/g, " ");
-    const adminPic = teamMember?.pic;
+    const adminPic = teamMember?.pic || user?.profileImage || user?.photoURL;
 
     if (loading) {
         return (
@@ -1135,10 +1145,14 @@ const UsersSection = ({ users, totalUsers, onDelete, currentUserEmail }: { users
                                     <tr key={i} className="hover:bg-slate-50 transition-colors">
                                         <td className="p-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs">
-                                                    {u.displayName?.charAt(0) || 'U'}
+                                                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center border-2 border-white shadow-sm shrink-0 overflow-hidden">
+                                                    {(u.profileImage || u.photoURL) ? (
+                                                        <img src={u.profileImage || u.photoURL} alt={u.displayName || u.name} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <span className="text-slate-500 font-bold text-xs">{(u.displayName || u.name || 'U').charAt(0)}</span>
+                                                    )}
                                                 </div>
-                                                <span className="font-bold text-slate-700">{u.displayName || 'N/A'}</span>
+                                                <span className="font-bold text-slate-700">{u.displayName || u.name || 'N/A'}</span>
                                             </div>
                                         </td>
                                         <td className="p-4 text-slate-600 font-medium">{u.email}</td>
@@ -1584,7 +1598,337 @@ const FinanceSection = ({ assignedProjects, isSuperAdmin, user }: { assignedProj
     );
 };
 
-const TeamMessagesSection = ({ user }: { user: any }) => {
+// --- NEW SECTIONS: Project & Team Publishing ---
+
+const CloudinaryUpload = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "studysmith_project");
+
+    try {
+        const response = await fetch("https://api.cloudinary.com/v1_1/db0vcogoj/image/upload", {
+            method: "POST",
+            body: formData,
+        });
+        const data = await response.json();
+        return data.secure_url;
+    } catch (error) {
+        console.error("Cloudinary upload error:", error);
+        throw error;
+    }
+};
+
+const ProjectPublishSection = () => {
+    const [projects, setProjects] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [fetching, setFetching] = useState(true);
+    const [isFormOpen, setIsFormOpen] = useState(false);
+    const [editId, setEditId] = useState<string | null>(null);
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+    const [formData, setFormData] = useState({
+        title: "",
+        description: "",
+        url: "",
+        image: null as File | null,
+        preview: "",
+    });
+
+    const fetchProjects = async () => {
+        setFetching(true);
+        try {
+            const q = query(collection(db, "projects"), orderBy("createdAt", "desc"));
+            const snapshot = await getDocs(q);
+            setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        } catch (error) {
+            console.error("Fetch projects error:", error);
+        } finally {
+            setFetching(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchProjects();
+    }, []);
+
+    const showToast = (message: string, type: 'success' | 'error') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+    };
+
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setFormData({
+                ...formData,
+                image: file,
+                preview: URL.createObjectURL(file),
+            });
+        }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!formData.image && !formData.preview) return showToast("Please select an image", "error");
+
+        setLoading(true);
+        try {
+            let imageUrl = formData.preview;
+            if (formData.image) {
+                imageUrl = await CloudinaryUpload(formData.image);
+            }
+
+            if (editId) {
+                await updateDoc(doc(db, "projects", editId), {
+                    title: formData.title,
+                    description: formData.description,
+                    url: formData.url,
+                    image: imageUrl,
+                    updatedAt: serverTimestamp(),
+                });
+                showToast("Project updated successfully!", "success");
+            } else {
+                await addDoc(collection(db, "projects"), {
+                    title: formData.title,
+                    description: formData.description,
+                    url: formData.url,
+                    image: imageUrl,
+                    createdAt: serverTimestamp(),
+                });
+                showToast("Project published successfully!", "success");
+            }
+            setFormData({ title: "", description: "", url: "", image: null, preview: "" });
+            setIsFormOpen(false);
+            setEditId(null);
+            fetchProjects();
+        } catch (error) {
+            showToast(editId ? "Update failed" : "Publish failed", "error");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleEdit = (proj: any) => {
+        setFormData({
+            title: proj.title,
+            description: proj.description,
+            url: proj.url,
+            image: null,
+            preview: proj.image
+        });
+        setEditId(proj.id);
+        setIsFormOpen(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this project?")) return;
+        try {
+            await deleteDoc(doc(db, "projects", id));
+            showToast("Project deleted", "success");
+            fetchProjects();
+        } catch (error) {
+            showToast("Delete failed", "error");
+        }
+    };
+
+    return (
+        <div className="mt-12 space-y-8 animate-in fade-in duration-700">
+            {toast && (
+                <div className={`fixed top-24 right-8 z-50 px-6 py-3 rounded-2xl shadow-2xl animate-in slide-in-from-right text-white font-bold text-sm ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
+                    {toast.message}
+                </div>
+            )}
+
+            <div className="bg-slate-900 text-white rounded-3xl p-8 shadow-2xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/20 rounded-full blur-[100px] -mr-32 -mt-32"></div>
+
+                <div className="flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
+                    <div className="text-center md:text-left">
+                        <h2 className="text-3xl font-black tracking-tight mb-2">Publish <span className="text-blue-400">Project</span></h2>
+                        <p className="text-slate-400 font-medium">Add your latest work to the portfolio gallery.</p>
+                    </div>
+                    <button
+                        onClick={() => {
+                            if (isFormOpen && editId) {
+                                setEditId(null);
+                                setFormData({ title: "", description: "", url: "", image: null, preview: "" });
+                            } else {
+                                setIsFormOpen(!isFormOpen);
+                            }
+                        }}
+                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3.5 rounded-2xl font-bold transition-all shadow-xl shadow-blue-500/20 active:scale-95"
+                    >
+                        {isFormOpen ? <X size={20} /> : <Plus size={20} />}
+                        {isFormOpen ? (editId ? "Cancel Edit" : "Close Form") : "New Project"}
+                    </button>
+                </div>
+
+                {isFormOpen && (
+                    <div className="mt-8 pt-8 border-t border-slate-800 animate-in slide-in-from-top duration-500">
+                        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block ml-1">Project Title</label>
+                                    <input
+                                        required
+                                        type="text"
+                                        value={formData.title}
+                                        onChange={e => setFormData({ ...formData, title: e.target.value })}
+                                        className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-600"
+                                        placeholder="Enter project title..."
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block ml-1">Project URL</label>
+                                    <input
+                                        required
+                                        type="url"
+                                        value={formData.url}
+                                        onChange={e => setFormData({ ...formData, url: e.target.value })}
+                                        className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-600"
+                                        placeholder="https://example.com"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block ml-1">Project Description</label>
+                                    <textarea
+                                        required
+                                        rows={4}
+                                        value={formData.description}
+                                        onChange={e => setFormData({ ...formData, description: e.target.value })}
+                                        className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-600 resize-none"
+                                        placeholder="Describe the project..."
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block ml-1">Cover Image</label>
+                                    <div className="relative group/upload h-[280px]">
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleImageChange}
+                                            className="hidden"
+                                            id="project-image-upload"
+                                        />
+                                        <label
+                                            htmlFor="project-image-upload"
+                                            className={`h-full w-full border-2 border-dashed rounded-3xl flex flex-col items-center justify-center cursor-pointer transition-all duration-300 overflow-hidden ${formData.preview ? 'border-blue-500 ring-4 ring-blue-500/10' : 'border-slate-700 hover:border-slate-500 hover:bg-slate-800/50'}`}
+                                        >
+                                            {formData.preview ? (
+                                                <img src={formData.preview} alt="Preview" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="flex flex-col items-center gap-3">
+                                                    <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center text-slate-500 group-hover/upload:text-blue-500 group-hover/upload:scale-110 transition-all duration-300">
+                                                        <Plus size={32} />
+                                                    </div>
+                                                    <p className="text-slate-500 font-bold">Select Project Image</p>
+                                                    <p className="text-[10px] text-slate-600 font-medium">PNG, JPG or WebP (Max 5MB)</p>
+                                                </div>
+                                            )}
+                                            {formData.preview && (
+                                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                    <p className="text-white font-bold flex items-center gap-2">
+                                                        <RefreshCw size={20} /> Change Image
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </label>
+                                    </div>
+                                </div>
+                                <button
+                                    disabled={loading}
+                                    type="submit"
+                                    className="w-full bg-white text-slate-900 py-4 rounded-2xl font-black text-lg shadow-xl hover:bg-blue-50 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-3"
+                                >
+                                    {loading ? <RefreshCw className="animate-spin" /> : (editId ? "UPDATE PROJECT" : "PUBLISH PROJECT")}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                )}
+            </div>
+
+            {/* Display Projects */}
+            <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-slate-800">Recent <span className="text-blue-600">Projects</span></h3>
+                    <span className="text-xs font-black text-slate-400 uppercase bg-slate-100 px-3 py-1 rounded-full">{projects.length} Published</span>
+                </div>
+
+                {fetching ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {[1, 2, 3].map(i => <div key={i} className="h-[400px] bg-slate-100 rounded-3xl animate-pulse"></div>)}
+                    </div>
+                ) : projects.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {projects.map((proj) => (
+                            <div key={proj.id} className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-blue-500/5 transition-all duration-500 group h-full flex flex-col">
+                                <div className="h-56 relative overflow-hidden">
+                                    {proj.image ? (
+                                        <img src={proj.image} alt={proj.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                                    ) : (
+                                        <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                                            <Briefcase size={32} className="text-slate-300" />
+                                        </div>
+                                    )}
+                                    {proj.url && (
+                                        <a
+                                            href={proj.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-[10px] font-black text-blue-600 uppercase tracking-widest shadow-sm hover:bg-blue-600 hover:text-white transition-colors"
+                                        >
+                                            Visit Link
+                                        </a>
+                                    )}
+                                    <div className="absolute top-4 right-4 z-10 flex gap-2">
+                                        <button
+                                            onClick={() => handleEdit(proj)}
+                                            className="bg-blue-500 hover:bg-blue-600 text-white p-2.5 rounded-xl opacity-0 group-hover:opacity-100 transition-all active:scale-95 shadow-lg shadow-blue-500/20"
+                                        >
+                                            <Pencil size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(proj.id)}
+                                            className="bg-red-500 hover:bg-red-600 text-white p-2.5 rounded-xl opacity-0 group-hover:opacity-100 transition-all active:scale-95 shadow-lg shadow-red-500/20"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="p-6 flex flex-col flex-1">
+                                    <h4 className="text-xl font-extrabold text-slate-800 mb-2 truncate">{proj.title}</h4>
+                                    <p className="text-slate-500 text-sm font-medium line-clamp-3 mb-6 flex-1 italic">"{proj.description}"</p>
+                                    <div className="flex justify-between items-center pt-5 border-t border-slate-50">
+                                        <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Added On</span>
+                                        <span className="text-xs font-bold text-slate-500">
+                                            {proj.createdAt?.toDate ? proj.createdAt.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : "Recently"}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="p-20 text-center bg-white rounded-[32px] border-2 border-dashed border-slate-200">
+                        <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center mx-auto mb-4 text-slate-300">
+                            <Briefcase size={40} />
+                        </div>
+                        <p className="text-slate-400 font-bold text-lg">No projects published yet.</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+
+
+const TeamMessagesSection = ({ user, allUsers = [] }: { user: any, allUsers?: any[] }) => {
     const [messages, setMessages] = useState<any[]>([]);
     const [newMessage, setNewMessage] = useState("");
     const [loading, setLoading] = useState(false);
@@ -1659,8 +2003,16 @@ const TeamMessagesSection = ({ user }: { user: any }) => {
                     messages.map((msg) => (
                         <div key={msg.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
                             <div className="flex-shrink-0">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md ${msg.senderRole === 'admin' || msg.senderRole === 'Admin' ? 'bg-purple-600' : 'bg-indigo-600'}`}>
-                                    {msg.senderName?.charAt(0).toUpperCase()}
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md overflow-hidden ${msg.senderRole === 'admin' || msg.senderRole === 'Admin' ? 'bg-purple-600' : 'bg-indigo-600'}`}>
+                                    {(() => {
+                                        const matchingUser = allUsers.find(u => u.email === msg.senderEmail);
+                                        const pic = matchingUser?.profileImage || matchingUser?.photoURL;
+                                        return pic ? (
+                                            <img src={pic} alt={msg.senderName} className="w-full h-full object-cover" />
+                                        ) : (
+                                            msg.senderName?.charAt(0).toUpperCase()
+                                        );
+                                    })()}
                                 </div>
                             </div>
                             <div className="flex-1 space-y-1.5">
@@ -1948,6 +2300,7 @@ export default function AdminDashboard() {
         { id: "payments", label: "Payments", icon: CreditCard },
         { id: "support", label: "Support Tickets", icon: MessageSquare },
         { id: "finance", label: "Financial Overview", icon: TrendingUp },
+        { id: "publish", label: "Publish Project", icon: Send },
         ...(isSuperAdmin ? [
             { id: "settings", label: "Control Panel", icon: Settings }
         ] : []),
@@ -2048,13 +2401,14 @@ export default function AdminDashboard() {
                     pendingPayments={pendingPayments}
                     totalTickets={totalTickets}
                     teamMembers={teamMembers}
+                    allUsers={allUsers}
                     onAddMember={handleAddTeamMember}
                     onDeleteMember={handleDeleteTeamMember}
                 />
             );
             case "projects": return <AdminProjects sheetUrl={sheetUrl} onUpdateUrl={handleUpdateSheetUrl} isSuperAdmin={isSuperAdmin} />;
             case "active-ids": return <AssignedProjectsSection projects={assignedProjects} users={allUsers} onDelete={handleDeleteProjectID} isSuperAdmin={isSuperAdmin} />;
-            case "team-updates": return <TeamMessagesSection user={user} />;
+            case "team-updates": return <TeamMessagesSection user={user} allUsers={allUsers} />;
             case "users":
                 if (user?.role === 'Team_Member') return <div className="p-8 text-center text-red-500 font-bold">Access Denied: Admin Only</div>;
                 return <UsersSection users={allUsers} totalUsers={totalUsers} onDelete={handleDeleteUser} currentUserEmail={user?.email} />;
@@ -2062,12 +2416,15 @@ export default function AdminDashboard() {
             case "support": return <AdminSupportSection />;
             case "finance":
                 return <FinanceSection assignedProjects={assignedProjects} isSuperAdmin={isSuperAdmin} user={user} />;
+            case "publish":
+                return <ProjectPublishSection />;
             case "settings":
                 if (!isSuperAdmin) {
                     return <div className="p-8 text-center text-red-500 font-bold">Access Denied: Super Admin Only</div>;
                 }
                 return <TeamSection
                     teamMembers={teamMembers}
+                    allUsers={allUsers}
                     onAddMember={handleAddTeamMember}
                     onDeleteMember={handleDeleteTeamMember}
                 />;
