@@ -11,10 +11,13 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 
 const navLinks = [
+    { name: "Home", href: "/" },
+    { name: "About Us", href: "/about" },
     { name: "Services", href: "/#projects" },
-    { name: "Demo-Project", href: "/demo-projects" },
+    { name: "Demo Project", href: "/demo-projects" },
     { name: "Technologies", href: "/#technologies" },
     { name: "Why Us", href: "/#why-us" },
+    { name: "Blog", href: "/blog" },
     { name: "FAQ", href: "/#faq" },
 ];
 
@@ -141,7 +144,7 @@ export default function Navbar() {
                     </span>
                 </a>
 
-                <div className={cn("hidden md:flex gap-8 text-base font-medium transition-colors duration-300", isDarkSection ? "text-slate-200" : "text-slate-600")}>
+                <div className={cn("hidden md:flex gap-6 text-base font-medium transition-colors duration-300", isDarkSection ? "text-slate-200" : "text-slate-900")}>
                     {navLinks.map((link) => (
                         <Link
                             key={link.name}
@@ -149,7 +152,7 @@ export default function Navbar() {
                             className={cn(
                                 "group relative py-1 transition-colors",
                                 isDarkSection ? "hover:text-white" : "hover:text-primary",
-                                activeSection === link.href.substring(2) ? (isDarkSection ? "text-white" : "text-primary") : ""
+                                (pathname === link.href || (pathname === "/" && link.href.startsWith("/#") && activeSection === link.href.substring(2))) ? (isDarkSection ? "text-white" : "text-primary") : ""
                             )}
                         >
                             {link.name}
@@ -157,7 +160,7 @@ export default function Navbar() {
                                 className={cn(
                                     "absolute bottom-0 left-0 h-0.5 transition-all duration-300 ease-in-out",
                                     isDarkSection ? "bg-white" : "bg-primary",
-                                    activeSection === link.href.substring(2) ? "w-full" : "w-0 group-hover:w-full"
+                                    (pathname === link.href || (pathname === "/" && link.href.startsWith("/#") && activeSection === link.href.substring(2))) ? "w-full" : "w-0 group-hover:w-full"
                                 )}
                             />
                         </Link>
@@ -241,7 +244,7 @@ export default function Navbar() {
                             onClick={() => setIsMobileMenuOpen(false)}
                             className={cn(
                                 "text-lg font-medium p-1 rounded-lg hover:bg-slate-50 transition-colors",
-                                activeSection === link.href.substring(2) ? "text-primary bg-blue-50" : "text-slate-600"
+                                (pathname === link.href || (pathname === "/" && link.href.startsWith("/#") && activeSection === link.href.substring(2))) ? "text-primary bg-blue-50" : "text-slate-600"
                             )}
                         >
                             {link.name}

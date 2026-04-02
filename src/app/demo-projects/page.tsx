@@ -34,12 +34,6 @@ const projects = [
         demoUrl: "https://thestudysmith9.wordpress.com"
     },
     {
-        title: "Personal Portfolio",
-        description: "A personal portfolio website to showcase skills, projects, and professional achievements.",
-        image: "project-demo/portfolio-jitesh.png",
-        demoUrl: "https://jitesh-z.netlify.app"
-    },
-    {
         title: "VivaMentor",
         description: "VivaMentor is a focused learning platform that helps students confidently prepare for project reviews and viva examinations.",
         image: "project-demo/vivamentor.png",

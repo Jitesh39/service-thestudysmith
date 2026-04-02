@@ -52,8 +52,10 @@ import {
     Bell,
     Send,
     Pencil,
+    FileText
 } from "lucide-react";
 import React, { useState, useEffect } from "react";
+import BlogManagementSection from "@/components/BlogManagementSection";
 
 const getTimeGreeting = () => {
     const hour = new Date().getHours();
@@ -658,12 +660,101 @@ const TeamSection = ({ teamMembers, onAddMember, onDeleteMember, hideHeader = fa
     );
 };
 
+const uploadImageToCloudinary = async (file: File): Promise<string> => {
+    try {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("upload_preset", "thestudysmith-admin");
+        formData.append("folder", "thestudysmith/admin");
+
+        const response = await fetch(`https://api.cloudinary.com/v1_1/db0vcogoj/image/upload`, {
+            method: "POST",
+            body: formData,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.error("Cloudinary Auth/Config Error:", data);
+            throw new Error(data.error?.message || "Failed to upload image.");
+        }
+
+        return data.secure_url;
+    } catch (error) {
+        console.error("Cloudinary upload execution error:", error);
+        throw error;
+    }
+};
+
 const ProfileSection = ({ user, loading, teamMembers }: { user: any; loading: boolean, teamMembers: any[] }) => {
+    const [isUploading, setIsUploading] = useState(false);
+    const [successMsg, setSuccessMsg] = useState("");
+    const [localPic, setLocalPic] = useState<string | null>(null);
+
     const teamMember = teamMembers.find(member => member.email === user?.email);
     const adminDesignation = teamMember?.designation || (user?.role === 'admin' ? "Administrator" : "Team Member");
     const rawRole = teamMember?.role || user?.role || "Team Member";
     const adminRole = rawRole.replace(/_/g, " ");
-    const adminPic = teamMember?.pic || user?.profileImage || user?.photoURL;
+
+    useEffect(() => {
+        const fetchAdminPic = async () => {
+            if (user?.uid) {
+                try {
+                    const adminDoc = await getDoc(doc(db, "admin", user.uid));
+                    if (adminDoc.exists() && adminDoc.data().profileImage) {
+                        setLocalPic(adminDoc.data().profileImage);
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch admin profile", e);
+                }
+            }
+        };
+        fetchAdminPic();
+    }, [user?.uid]);
+
+    const adminPic = localPic || teamMember?.pic || user?.profileImage || user?.photoURL;
+
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        setSuccessMsg("");
+
+        try {
+            const secure_url = await uploadImageToCloudinary(file);
+
+            // Update Firestore admin collection
+            const adminRef = doc(db, "admin", user.uid);
+            const adminDoc = await getDoc(adminRef);
+
+            if (adminDoc.exists()) {
+                await updateDoc(adminRef, { profileImage: secure_url, updatedAt: serverTimestamp() });
+            } else {
+                await setDoc(adminRef, {
+                    email: user.email,
+                    name: user.displayName || "",
+                    profileImage: secure_url,
+                    createdAt: serverTimestamp()
+                });
+            }
+
+            // If user is also a team member, optionally update the team collection
+            if (teamMember?.id) {
+                await updateDoc(doc(db, "team", teamMember.id), { pic: secure_url });
+            }
+
+            setLocalPic(secure_url);
+            setSuccessMsg("Profile image updated successfully!");
+            setTimeout(() => setSuccessMsg(""), 3000);
+        } catch (error: any) {
+            alert("Upload Failed: " + (error.message || "Unknown error occurred."));
+        } finally {
+            setIsUploading(false);
+            // Reset input so the same file can be selected again
+            e.target.value = '';
+        }
+    };
 
     if (loading) {
         return (
@@ -689,16 +780,39 @@ const ProfileSection = ({ user, loading, teamMembers }: { user: any; loading: bo
     }
 
     return (
-        <div className="h-full bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-100">
-            <h2 className="text-xl md:text-2xl font-bold text-slate-800 mb-6 border-b border-slate-50 pb-4 pl-3">Profile Section</h2>
+        <div className="h-full bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-100 relative">
+            <div className="flex justify-between items-center mb-6 border-b border-slate-50 pb-4 pl-3">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-800">Profile Section</h2>
+                {successMsg && (
+                    <div className="text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full flex items-center gap-1 animate-in fade-in">
+                        <CheckCircle size={14} /> {successMsg}
+                    </div>
+                )}
+            </div>
             <div className="space-y-8">
                 <div className="flex flex-col sm:flex-row items-center gap-5 pb-8 border-b border-slate-50">
-                    <div className="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center text-white text-4xl font-bold shadow-xl border-4 border-white overflow-hidden">
-                        {adminPic ? (
-                            <img src={adminPic} alt={user?.displayName || 'Admin'} className="w-full h-full object-cover" />
-                        ) : (
-                            user?.displayName ? user.displayName.charAt(0).toUpperCase() : (user?.email ? user.email.charAt(0).toUpperCase() : 'A')
-                        )}
+                    <div className="relative group">
+                        <div className="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center text-white text-4xl font-bold shadow-xl border-4 border-white overflow-hidden relative">
+                            {isUploading ? (
+                                <RefreshCw size={24} className="animate-spin text-white" />
+                            ) : adminPic ? (
+                                <img src={adminPic} alt={user?.displayName || 'Admin'} className="w-full h-full object-cover" />
+                            ) : (
+                                user?.displayName ? user.displayName.charAt(0).toUpperCase() : (user?.email ? user.email.charAt(0).toUpperCase() : 'A')
+                            )}
+
+                            <label className="absolute inset-0 bg-black/50 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                <Pencil size={18} />
+                                <span className="text-[10px] font-bold mt-1">Edit</span>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleUpload}
+                                    disabled={isUploading}
+                                />
+                            </label>
+                        </div>
                     </div>
                     <div className="text-center sm:text-left space-y-1">
                         <h3 className="text-2xl font-bold text-slate-900 leading-tight">{user?.displayName || 'Admin Account'}</h3>
@@ -2299,8 +2413,9 @@ export default function AdminDashboard() {
         ...(user?.role === 'Team_Member' ? [] : [{ id: "users", label: "Users", icon: Users }]),
         { id: "payments", label: "Payments", icon: CreditCard },
         { id: "support", label: "Support Tickets", icon: MessageSquare },
+        { id: "blog-management", label: user?.role === 'admin' || user?.email === 'thestudysmithpu@gmail.com' ? "Blog Management" : "Write Blog", icon: FileText },
         { id: "finance", label: "Financial Overview", icon: TrendingUp },
-        { id: "publish", label: "Publish Project", icon: Send },
+        ...(user?.role === 'Team_Member' ? [] : [{ id: "publish", label: "Publish Project", icon: Send }]),
         ...(isSuperAdmin ? [
             { id: "settings", label: "Control Panel", icon: Settings }
         ] : []),
@@ -2414,9 +2529,11 @@ export default function AdminDashboard() {
                 return <UsersSection users={allUsers} totalUsers={totalUsers} onDelete={handleDeleteUser} currentUserEmail={user?.email} />;
             case "payments": return <AdminPaymentsSection projects={assignedProjects} />;
             case "support": return <AdminSupportSection />;
+            case "blog-management": return <BlogManagementSection user={user} />;
             case "finance":
                 return <FinanceSection assignedProjects={assignedProjects} isSuperAdmin={isSuperAdmin} user={user} />;
             case "publish":
+                if (user?.role === 'Team_Member') return <div className="p-8 text-center text-red-500 font-bold">Access Denied: Admin Only</div>;
                 return <ProjectPublishSection />;
             case "settings":
                 if (!isSuperAdmin) {
