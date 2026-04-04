@@ -18,6 +18,15 @@ if (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
 }
 
 import { getFirestore } from "firebase/firestore";
+import { getMessaging, Messaging } from "firebase/messaging";
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// Messaging instance for foreground handling
+let messaging: Messaging | null = null;
+if (typeof window !== "undefined") {
+    messaging = getMessaging(app);
+}
+
+export { messaging };

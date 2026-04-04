@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import ScrollToTop from "@/components/ScrollToTop";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import Chatbot from "@/components/Chatbot";
+import NotificationHandler from "@/components/NotificationHandler";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,6 +39,7 @@ export default function RootLayout({
           crossOrigin="anonymous"
           strategy="afterInteractive"
         />
+        <NotificationHandler />
         {children}
         {!hideFloatingIcons && (
           <>
