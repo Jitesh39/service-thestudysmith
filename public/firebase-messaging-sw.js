@@ -7,12 +7,12 @@ importScripts('https://www.gstatic.com/firebasejs/10.0.0/firebase-messaging-comp
 // These values are required for FCM service worker. 
 // They now match your firebaseConfig from .env.local
 const firebaseConfig = {
-    apiKey: "AIzaSyDiu47OFOeQTYcQCH6szMumBH4VnKANztQ",
-    authDomain: "service-thestudysmith.firebaseapp.com",
-    projectId: "service-thestudysmith",
-    storageBucket: "service-thestudysmith.firebasestorage.app",
-    messagingSenderId: "117806073315",
-    appId: "1:117806073315:web:435393f8230a829ddd0cd6",
+  apiKey: "AIzaSyDiu47OFOeQTYcQCH6szMumBH4VnKANztQ",
+  authDomain: "service-thestudysmith.firebaseapp.com",
+  projectId: "service-thestudysmith",
+  storageBucket: "service-thestudysmith.firebasestorage.app",
+  messagingSenderId: "117806073315",
+  appId: "1:117806073315:web:435393f8230a829ddd0cd6",
 };
 
 // Initialize the Firebase app in the service worker.
@@ -24,12 +24,16 @@ const messaging = firebase.messaging();
 // If you want to handle background notifications (not just show them)
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
-  
-  const notificationTitle = payload.notification.title;
+
+  // Use optional chaining and fallbacks to prevent the worker from crashing
+  const notificationTitle = payload.notification?.title || payload.data?.title || "Update from TheStudySmith";
   const notificationOptions = {
-    body: payload.notification.body,
-    icon: '/firebase-logo.png' // Ensure you have this or another icon in public folder
+    body: payload.notification?.body || payload.data?.body || "Check your dashboard for new updates.",
+    icon: '/logo1.png', // Corrected path based on project icons
+    badge: '/logo1.png',
+    tag: 'thestudysmith-important', // Helps merge notifications
+    requireInteraction: true // Keeps notification visible until clicked
   };
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
+  return self.registration.showNotification(notificationTitle, notificationOptions);
 });
