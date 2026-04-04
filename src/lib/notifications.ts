@@ -61,15 +61,15 @@ export const onForegroundMessage = () => {
 
     // Show a system notification even when in foreground
     if (typeof Notification !== 'undefined' && Notification.permission === "granted") {
-        const notificationTitle = payload.notification?.title || "Notification from TheStudySmith";
-        const notificationOptions = {
-            body: payload.notification?.body || "Check your dashboard for updates.",
-            icon: '/logo1.png', // Correct relative path from public folder
-            badge: '/logo1.png'
-        };
-        
-        // This will show a system notification even if the tab is open
-        new Notification(notificationTitle, notificationOptions);
+      const notificationTitle = payload.notification?.title || "Notification from TheStudySmith";
+      const notificationOptions = {
+        body: payload.notification?.body || "Check your dashboard for updates.",
+        icon: '/logo1.png', // Correct relative path from public folder
+        badge: '/logo1.png'
+      };
+
+      // This will show a system notification even if the tab is open
+      new Notification(notificationTitle, notificationOptions);
     }
 
     // Optional: Keep the alert for debug or secondary confirmation

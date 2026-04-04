@@ -2136,7 +2136,7 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
                     token: fcmToken,
                     title: notificationTitle,
                     body: notificationBody,
-                    clickAction: url || "/dashboard"
+                    clickAction: url || "https://thestudysmith.com"
                 }),
             });
             const data = await response.json();

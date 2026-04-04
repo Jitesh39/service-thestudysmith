@@ -21,27 +21,20 @@ firebase.initializeApp(firebaseConfig);
 // Retrieve an instance of Firebase Messaging so that it can handle background messages.
 const messaging = firebase.messaging();
 
-// Handle background notifications
+// If you want to handle background notifications (not just show them)
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
 
-  // IMPORTANT: Chrome flags sites as "Spam" if you show a manual notification 
-  // when the payload already contains a "notification" object (which Firebase shows automatically).
-  if (payload.notification) {
-    console.log('FCM notification detected, letting the SDK handle display to avoid spam filters.');
-    return;
-  }
-
-  // If there is no notification object (data-only message), show one manually
-  const notificationTitle = payload.data?.title || "Update from TheStudySmith";
+  // Use optional chaining and fallbacks to prevent the worker from crashing
+  const notificationTitle = payload.notification?.title || payload.data?.title || "Update from TheStudySmith";
   const notificationOptions = {
-    body: payload.data?.body || "Check your dashboard for new updates.",
-    icon: '/logo1.png',
+    body: payload.notification?.body || payload.data?.body || "Check your dashboard for new updates.",
+    icon: '/logo1.png', // Corrected path based on project icons
     badge: '/logo1.png',
-    tag: 'thestudysmith-update',
-    requireInteraction: true,
+    tag: 'thestudysmith-important', // Helps merge notifications
+    requireInteraction: true, // Keeps notification visible until clicked
     data: {
-      url: payload.data?.click_action || '/dashboard'
+      url: payload.data?.click_action || payload.notification?.click_action || '/dashboard'
     }
   };
 
