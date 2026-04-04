@@ -59,6 +59,7 @@ import {
 } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import BlogManagementSection from "@/components/BlogManagementSection";
+import { getFCMToken } from "@/lib/notifications";
 
 const getTimeGreeting = () => {
     const hour = new Date().getHours();
@@ -2054,12 +2055,13 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
     const [title, setTitle] = useState("");
     const [body, setBody] = useState("");
     const [clickAction, setClickAction] = useState("");
-    
+
     const [targetType, setTargetType] = useState<"Team Member" | "Client" | "All Client">("Team Member");
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedRecipients, setSelectedRecipients] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
+    const [myToken, setMyToken] = useState<string | null>(null);
 
     const isTeamBroadcast = targetType === "Team Member";
     const isClientBroadcast = targetType === "All Client";
@@ -2070,6 +2072,14 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setNotifications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         });
+
+        // Get own token for status display
+        const checkToken = async () => {
+            const token = await getFCMToken();
+            setMyToken(token);
+        };
+        checkToken();
+
         return () => unsubscribe();
     }, []);
 
@@ -2089,6 +2099,7 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
 
     const sendPushNotification = async (fcmToken: string, notificationTitle: string, notificationBody: string, url?: string) => {
         try {
+            console.log("Sending Push to Token [truncated]: ", fcmToken.substring(0, 15) + "...");
             const response = await fetch("/api/send-fcm", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -2100,11 +2111,13 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
                 }),
             });
             const data = await response.json();
-            if (!data.success) {
-                console.warn(`FCM failed for token: ${fcmToken.substring(0, 10)}...`, data.error);
+            if (data.success) {
+                console.log("✅ Push Delivered:", data.messageId);
+            } else {
+                console.error("❌ Push Failed:", data.error);
             }
         } catch (error) {
-            console.error("FCM API call error:", error);
+            console.error("🚨 FCM API Network Error:", error);
         }
     };
 
@@ -2123,6 +2136,8 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
         if (!isBroadcast && selectedRecipients.length === 0) return;
 
         setLoading(true);
+        let pushCount = 0;
+
         try {
             // 1. SAVE TO FIRESTORE (Existing behavior)
             if (isBroadcast) {
@@ -2147,16 +2162,18 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
                     if (isTeamBroadcast) return u.role === "Team_Member";
                     return u.role !== "admin" && u.role !== "Team_Member";
                 });
-                
-                const pushPromises = recipients
-                    .filter(u => u.fcmToken)
+
+                const validRecipients = recipients.filter(u => u.fcmToken);
+                pushCount = validRecipients.length;
+
+                const pushPromises = validRecipients
                     .map(u => sendPushNotification(u.fcmToken, title, body, finalClickAction));
-                
+
                 await Promise.all(pushPromises);
 
             } else {
                 // Multiple individual notifications
-                const batch = selectedRecipients.map(async (recipient) => {
+                const batchPromises = selectedRecipients.map(async (recipient) => {
                     // Save to DB
                     await addDoc(collection(db, "notifications"), {
                         title: title,
@@ -2176,10 +2193,11 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
 
                     // Send FCM if token exists
                     if (recipient.fcmToken) {
+                        pushCount++;
                         await sendPushNotification(recipient.fcmToken, title, body, finalClickAction);
                     }
                 });
-                await Promise.all(batch);
+                await Promise.all(batchPromises);
             }
 
             setTitle("");
@@ -2187,7 +2205,7 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
             setClickAction("");
             setSelectedRecipients([]);
             setSearchQuery("");
-            alert(`Notification successfully delivered via Dashboard and Push Messaging!`);
+            alert(`Succesfully sent! ${pushCount} push notifications were dispatched. If 0 were dispatched, the selected clients have not granted notification permissions yet.`);
         } catch (error) {
             console.error("Error sending notification:", error);
             alert("An error occurred while sending the notification.");
@@ -2208,14 +2226,23 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
     return (
         <div className="max-w-4xl space-y-8 pb-10">
             <div className="bg-white/80 backdrop-blur-md p-6 md:p-10 rounded-[2.5rem] shadow-2xl shadow-blue-500/5 border border-slate-100 ring-1 ring-slate-200/50">
-                <div className="flex items-center gap-5 mb-10">
-                    <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-3xl shadow-xl shadow-blue-200 flex items-center justify-center relative overflow-hidden group">
-                        <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <Bell size={28} className="relative z-10" />
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+                    <div className="flex items-center gap-5">
+                        <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-3xl shadow-xl shadow-blue-200 flex items-center justify-center relative overflow-hidden group">
+                            <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <Bell size={28} className="relative z-10" />
+                        </div>
+                        <div>
+                            <h2 className="text-3xl font-black text-slate-800 tracking-tight">Structured <span className="text-blue-600">Push Messaging</span></h2>
+                            <p className="text-slate-500 font-medium text-sm mt-1">Deploy real-time FCM notifications to your users instantly.</p>
+                        </div>
                     </div>
-                    <div>
-                        <h2 className="text-3xl font-black text-slate-800 tracking-tight">Structured <span className="text-blue-600">Push Messaging</span></h2>
-                        <p className="text-slate-500 font-medium text-sm mt-1">Deploy real-time FCM notifications to your users instantly.</p>
+
+                    <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-50 rounded-2xl border border-slate-100">
+                        <div className={`w-2.5 h-2.5 rounded-full ${myToken ? 'bg-green-500 animate-pulse' : 'bg-red-400'}`}></div>
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                            Your Status: {myToken ? 'Listening' : 'No Token Found'}
+                        </span>
                     </div>
                 </div>
 
@@ -2357,7 +2384,7 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
                                     />
                                 </div>
                             </div>
-                            
+
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Message Content <span className="text-red-500">*</span></label>
                                 <textarea
@@ -2381,7 +2408,7 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
                                 <RefreshCw className="animate-spin" size={20} />
                             ) : (
                                 <>
-                                    Dispatch Notification 
+                                    Dispatch Notification
                                     <div className="p-1.5 bg-white/10 rounded-full group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform">
                                         <Send size={18} />
                                     </div>
@@ -2458,12 +2485,12 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
                                             </p>
                                         </div>
                                     )}
-                                    
+
                                     {notif.clickAction && (
                                         <div className="flex">
-                                            <a 
-                                                href={notif.clickAction} 
-                                                target="_blank" 
+                                            <a
+                                                href={notif.clickAction}
+                                                target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="inline-flex items-center gap-2 text-[10px] font-black text-blue-600 hover:text-blue-700 bg-blue-50/50 hover:bg-blue-100 px-4 py-2 rounded-2xl border border-blue-100 transition-all active:scale-95"
                                             >

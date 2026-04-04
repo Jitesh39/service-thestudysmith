@@ -1,7 +1,7 @@
 "use client";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { useEffect } from "react";
 import { requestPermission, getFCMToken, onForegroundMessage } from "@/lib/notifications";
 
@@ -21,10 +21,10 @@ const NotificationHandler = () => {
                     if (user?.uid) {
                         try {
                             const userRef = doc(db, "users", user.uid);
-                            await updateDoc(userRef, { 
+                            await setDoc(userRef, { 
                                 fcmToken: token,
                                 lastTokenUpdate: new Date().toISOString()
-                            });
+                            }, { merge: true });
                             console.log("FCM Token stored in database for user:", user.email);
                         } catch (err) {
                             console.error("Error storing FCM token:", err);

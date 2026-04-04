@@ -59,10 +59,21 @@ export const onForegroundMessage = () => {
   onMessage(firebaseMessaging, (payload) => {
     console.log("Message received in foreground. ", payload);
 
-    // Show a custom UI-based notification since browser push 
-    // doesn't usually show when the app is in the foreground
+    // Show a system notification even when in foreground
+    if (typeof Notification !== 'undefined' && Notification.permission === "granted") {
+        const notificationTitle = payload.notification?.title || "Notification from TheStudySmith";
+        const notificationOptions = {
+            body: payload.notification?.body || "Check your dashboard for updates.",
+            icon: '/logo1.png', // Correct relative path from public folder
+            badge: '/logo1.png'
+        };
+        
+        // This will show a system notification even if the tab is open
+        new Notification(notificationTitle, notificationOptions);
+    }
+
+    // Optional: Keep the alert for debug or secondary confirmation
     if (typeof window !== "undefined") {
-      // For production, you may want to use a toast/alert or custom UI.
       alert(`Notification: ${payload.notification?.title}\n${payload.notification?.body}`);
     }
   });
