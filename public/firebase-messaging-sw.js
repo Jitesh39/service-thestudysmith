@@ -32,8 +32,33 @@ messaging.onBackgroundMessage((payload) => {
     icon: '/logo1.png', // Corrected path based on project icons
     badge: '/logo1.png',
     tag: 'thestudysmith-important', // Helps merge notifications
-    requireInteraction: true // Keeps notification visible until clicked
+    requireInteraction: true, // Keeps notification visible until clicked
+    data: {
+      url: payload.data?.click_action || payload.notification?.click_action || '/dashboard'
+    }
   };
 
   return self.registration.showNotification(notificationTitle, notificationOptions);
+});
+
+// Handle notification click - Redirect to the specified URL
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || '/dashboard';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // If a window is already open, focus it and navigate
+      for (var i = 0; i < windowClients.length; i++) {
+        var client = windowClients[i];
+        if (client.url === targetUrl && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // If no window is open, open a new one
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
 });

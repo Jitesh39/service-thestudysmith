@@ -54,7 +54,8 @@ import {
     Send,
     Pencil,
     FileText,
-    Search
+    Search,
+    ExternalLink
 } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import BlogManagementSection from "@/components/BlogManagementSection";
@@ -2050,12 +2051,19 @@ const ProjectPublishSection = () => {
 
 const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUsers?: any[] }) => {
     const [notifications, setNotifications] = useState<any[]>([]);
-    const [newMessage, setNewMessage] = useState("");
+    const [title, setTitle] = useState("");
+    const [body, setBody] = useState("");
+    const [clickAction, setClickAction] = useState("");
+    
     const [targetType, setTargetType] = useState<"Team Member" | "Client" | "All Client">("Team Member");
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedRecipients, setSelectedRecipients] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
+
+    const isTeamBroadcast = targetType === "Team Member";
+    const isClientBroadcast = targetType === "All Client";
+    const isBroadcast = isTeamBroadcast || isClientBroadcast;
 
     useEffect(() => {
         const q = query(collection(db, "notifications"), orderBy("timestamp", "desc"), limit(50));
@@ -2079,22 +2087,49 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
         return matchesQuery;
     });
 
+    const sendPushNotification = async (fcmToken: string, notificationTitle: string, notificationBody: string, url?: string) => {
+        try {
+            const response = await fetch("/api/send-fcm", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    token: fcmToken,
+                    title: notificationTitle,
+                    body: notificationBody,
+                    clickAction: url || "/dashboard"
+                }),
+            });
+            const data = await response.json();
+            if (!data.success) {
+                console.warn(`FCM failed for token: ${fcmToken.substring(0, 10)}...`, data.error);
+            }
+        } catch (error) {
+            console.error("FCM API call error:", error);
+        }
+    };
+
     const handlePostNotification = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim()) return;
+        if (!title.trim() || !body.trim()) {
+            alert("Title and Body are required!");
+            return;
+        }
 
-        const isTeamBroadcast = targetType === "Team Member";
-        const isClientBroadcast = targetType === "All Client";
-        const isBroadcast = isTeamBroadcast || isClientBroadcast;
+        let finalClickAction = clickAction.trim();
+        if (finalClickAction && !finalClickAction.startsWith("http")) {
+            finalClickAction = "https://" + finalClickAction;
+        }
 
         if (!isBroadcast && selectedRecipients.length === 0) return;
 
         setLoading(true);
         try {
+            // 1. SAVE TO FIRESTORE (Existing behavior)
             if (isBroadcast) {
-                // Single broadcast document
                 await addDoc(collection(db, "notifications"), {
-                    message: newMessage,
+                    title: title,
+                    message: body,
+                    clickAction: finalClickAction,
                     receiverId: isTeamBroadcast ? "all_team" : "all_client",
                     receiverEmail: isTeamBroadcast ? "all_team@thestudysmith.com" : "all_client@thestudysmith.com",
                     receiverName: isTeamBroadcast ? "All Team Members" : "All Clients",
@@ -2106,30 +2141,56 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
                     isRead: false,
                     timestamp: serverTimestamp()
                 });
+
+                // 2. SEND FCM TO ALL ELIGIBLE USERS
+                const recipients = allUsers.filter(u => {
+                    if (isTeamBroadcast) return u.role === "Team_Member";
+                    return u.role !== "admin" && u.role !== "Team_Member";
+                });
+                
+                const pushPromises = recipients
+                    .filter(u => u.fcmToken)
+                    .map(u => sendPushNotification(u.fcmToken, title, body, finalClickAction));
+                
+                await Promise.all(pushPromises);
+
             } else {
                 // Multiple individual notifications
-                const batch = selectedRecipients.map(recipient => addDoc(collection(db, "notifications"), {
-                    message: newMessage,
-                    receiverId: recipient.uid,
-                    receiverEmail: recipient.email,
-                    receiverName: recipient.displayName || recipient.name || recipient.email,
-                    receiverImage: recipient.profileImage || recipient.photoURL || null,
-                    receiverType: "client",
-                    senderId: user.uid,
-                    senderName: user.displayName || user.email,
-                    senderPhoto: user.profileImage || user.photoURL || null,
-                    isRead: false,
-                    timestamp: serverTimestamp()
-                }));
+                const batch = selectedRecipients.map(async (recipient) => {
+                    // Save to DB
+                    await addDoc(collection(db, "notifications"), {
+                        title: title,
+                        message: body,
+                        clickAction: finalClickAction,
+                        receiverId: recipient.uid,
+                        receiverEmail: recipient.email,
+                        receiverName: recipient.displayName || recipient.name || recipient.email,
+                        receiverImage: recipient.profileImage || recipient.photoURL || null,
+                        receiverType: "client",
+                        senderId: user.uid,
+                        senderName: user.displayName || user.email,
+                        senderPhoto: user.profileImage || user.photoURL || null,
+                        isRead: false,
+                        timestamp: serverTimestamp()
+                    });
+
+                    // Send FCM if token exists
+                    if (recipient.fcmToken) {
+                        await sendPushNotification(recipient.fcmToken, title, body, finalClickAction);
+                    }
+                });
                 await Promise.all(batch);
             }
 
-            setNewMessage("");
+            setTitle("");
+            setBody("");
+            setClickAction("");
             setSelectedRecipients([]);
             setSearchQuery("");
-            alert(isBroadcast ? `Broadcast sent to ${isTeamBroadcast ? 'all team members' : 'all clients'}!` : `Notification sent to ${selectedRecipients.length} clients!`);
+            alert(`Notification successfully delivered via Dashboard and Push Messaging!`);
         } catch (error) {
             console.error("Error sending notification:", error);
+            alert("An error occurred while sending the notification.");
         } finally {
             setLoading(false);
         }
@@ -2146,159 +2207,186 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
 
     return (
         <div className="max-w-4xl space-y-8 pb-10">
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
-                <div className="flex items-center gap-3 mb-8">
-                    <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-200">
-                        <Bell size={24} />
+            <div className="bg-white/80 backdrop-blur-md p-6 md:p-10 rounded-[2.5rem] shadow-2xl shadow-blue-500/5 border border-slate-100 ring-1 ring-slate-200/50">
+                <div className="flex items-center gap-5 mb-10">
+                    <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-3xl shadow-xl shadow-blue-200 flex items-center justify-center relative overflow-hidden group">
+                        <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <Bell size={28} className="relative z-10" />
                     </div>
                     <div>
-                        <h2 className="text-2xl font-black text-slate-800">Send Notification</h2>
-                        <p className="text-slate-500 font-medium text-sm italic">Communicate with your team and clients instantly.</p>
+                        <h2 className="text-3xl font-black text-slate-800 tracking-tight">Structured <span className="text-blue-600">Push Messaging</span></h2>
+                        <p className="text-slate-500 font-medium text-sm mt-1">Deploy real-time FCM notifications to your users instantly.</p>
                     </div>
                 </div>
 
                 <form onSubmit={handlePostNotification} className="space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="space-y-3">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Send To</label>
-                            <div className="relative group">
-                                <select
-                                    value={targetType}
-                                    onChange={(e) => {
-                                        setTargetType(e.target.value as any);
-                                        setSelectedRecipients([]);
-                                        setSearchQuery("");
-                                    }}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold text-slate-700 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none appearance-none transition-all cursor-pointer hover:bg-white"
-                                >
-                                    <option value="Team Member">Team Member</option>
-                                    <option value="Client">Specific Client</option>
-                                    <option value="All Client">All Clients (Broadcast)</option>
-                                </select>
-                                <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                                    <ChevronDown size={18} />
+                    <div className="bg-slate-50/50 p-6 md:p-8 rounded-3xl border border-slate-100 space-y-8">
+                        {/* Recipient Selection */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Universal Targeting</label>
+                                <div className="relative">
+                                    <select
+                                        value={targetType}
+                                        onChange={(e) => {
+                                            setTargetType(e.target.value as any);
+                                            setSelectedRecipients([]);
+                                            setSearchQuery("");
+                                        }}
+                                        className="w-full bg-white border-2 border-slate-100 rounded-2xl px-5 py-4 text-sm font-black text-slate-700 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none appearance-none transition-all cursor-pointer shadow-sm"
+                                    >
+                                        <option value="Team Member">Team Member</option>
+                                        <option value="Client">Specific Client</option>
+                                        <option value="All Client">All Clients (Broadcast)</option>
+                                    </select>
+                                    <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" size={18} />
                                 </div>
                             </div>
+
+                            {targetType === "Client" && (
+                                <div className="space-y-4 relative">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Search Database</label>
+                                    <div className="relative">
+                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                        <input
+                                            type="text"
+                                            value={searchQuery}
+                                            onChange={(e) => { setSearchQuery(e.target.value); setIsSearching(true); }}
+                                            onFocus={() => setIsSearching(true)}
+                                            placeholder="Find client by name or email..."
+                                            className="w-full bg-white border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-slate-700 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all shadow-sm"
+                                        />
+                                    </div>
+
+                                    {isSearching && searchQuery && (
+                                        <div className="absolute z-20 w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-2xl max-h-[250px] overflow-y-auto p-1 divide-y divide-slate-50">
+                                            {filteredUsers.filter(u => !selectedRecipients.find(r => r.uid === u.uid)).map((u) => (
+                                                <button
+                                                    key={u.uid}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedRecipients(prev => [...prev, u]);
+                                                        setSearchQuery("");
+                                                        setIsSearching(false);
+                                                    }}
+                                                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-left transition-colors first:rounded-t-xl last:rounded-b-xl"
+                                                >
+                                                    <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 text-xs font-black shrink-0 overflow-hidden border border-slate-200">
+                                                        {(u.profileImage || u.photoURL) ? (
+                                                            <img src={u.profileImage || u.photoURL} alt="" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            (u.displayName || u.name || u.email).charAt(0)
+                                                        )}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-black text-slate-800 truncate">{u.displayName || u.name || 'No Name'}</p>
+                                                        <p className="text-[10px] text-slate-400 font-bold truncate">{u.email}</p>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {isBroadcast && (
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Live Targeting Status</label>
+                                    <div className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl border ${isTeamBroadcast ? 'bg-green-50 border-green-100' : 'bg-blue-50 border-blue-100'}`}>
+                                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white ${isTeamBroadcast ? 'bg-green-600' : 'bg-blue-600'}`}>
+                                            {isTeamBroadcast ? <Users size={18} /> : <Send size={18} />}
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className={`text-sm font-black ${isTeamBroadcast ? 'text-green-700' : 'text-blue-700'}`}>
+                                                {isTeamBroadcast ? 'Internal Broadcast' : 'Universal Client Outreach'}
+                                            </span>
+                                            <span className="text-[10px] font-bold opacity-60 uppercase tracking-tighter">Will trigger FCM on all active devices</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        {targetType === "Team Member" ? (
-                            <div className="space-y-3">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Targeting</label>
-                                <div className="flex items-center gap-3 bg-green-50 border border-green-100 rounded-xl px-4 py-3">
-                                    <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-white">
-                                        <Users size={16} />
+                        {/* Selected Recipients Chips */}
+                        {targetType === "Client" && selectedRecipients.length > 0 && (
+                            <div className="flex flex-wrap gap-2 p-3 bg-white border-2 border-slate-100 rounded-2xl min-h-[60px] shadow-sm">
+                                {selectedRecipients.map((recipient) => (
+                                    <div key={recipient.uid} className="flex items-center gap-2 bg-blue-600 text-white pl-1 pr-3 py-1.5 rounded-xl shadow-lg shadow-blue-500/10 animate-in zoom-in-95 duration-200">
+                                        <div className="w-7 h-7 rounded-lg bg-blue-500 flex items-center justify-center text-[11px] font-black overflow-hidden border border-white/20">
+                                            {(recipient.profileImage || recipient.photoURL) ? (
+                                                <img src={recipient.profileImage || recipient.photoURL} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                                (recipient.displayName || recipient.name || recipient.email).charAt(0)
+                                            )}
+                                        </div>
+                                        <span className="text-xs font-bold">{recipient.displayName || recipient.name || recipient.email}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedRecipients(prev => prev.filter(r => r.uid !== recipient.uid))}
+                                            className="ml-1 hover:text-red-300 transition-colors"
+                                        >
+                                            <X size={14} />
+                                        </button>
                                     </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-black text-green-700">Team Broadcast</span>
-                                        <span className="text-[10px] font-bold text-green-600/70 uppercase">Reaches All Team Members</span>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : targetType === "All Client" ? (
-                            <div className="space-y-3">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Targeting</label>
-                                <div className="flex items-center gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
-                                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white">
-                                        <Bell size={16} />
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-black text-blue-700">Universal Broadcast</span>
-                                        <span className="text-[10px] font-bold text-blue-600/70 uppercase">Reaches All Registered Clients</span>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="space-y-4 relative">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Select Specific Clients</label>
-
-                                {selectedRecipients.length > 0 && (
-                                    <div className="flex flex-wrap gap-2 p-2 bg-slate-50 border border-slate-100 rounded-2xl min-h-[50px]">
-                                        {selectedRecipients.map((recipient) => (
-                                            <div key={recipient.uid} className="flex items-center gap-2 bg-blue-600 text-white pl-1 pr-2 py-1 rounded-xl shadow-sm animate-in zoom-in-95 duration-200">
-                                                <div className="w-6 h-6 rounded-lg bg-blue-500 flex items-center justify-center text-[10px] font-black overflow-hidden">
-                                                    {(recipient.profileImage || recipient.photoURL) ? (
-                                                        <img src={recipient.profileImage || recipient.photoURL} alt="" className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        (recipient.displayName || recipient.name || recipient.email).charAt(0)
-                                                    )}
-                                                </div>
-                                                <span className="text-xs font-bold truncate max-w-[100px]">{recipient.displayName || recipient.name || recipient.email}</span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setSelectedRecipients(prev => prev.filter(r => r.uid !== recipient.uid))}
-                                                    className="hover:text-red-200 transition-colors"
-                                                >
-                                                    <X size={14} />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                <div className="relative">
-                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                    <input
-                                        type="text"
-                                        value={searchQuery}
-                                        onChange={(e) => { setSearchQuery(e.target.value); setIsSearching(true); }}
-                                        onFocus={() => setIsSearching(true)}
-                                        placeholder={selectedRecipients.length > 0 ? "Add more clients..." : "Find client by name or email..."}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-slate-700 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
-                                    />
-                                </div>
-
-                                {isSearching && searchQuery && (
-                                    <div className="absolute z-20 w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-2xl max-h-[250px] overflow-y-auto p-1 divide-y divide-slate-50">
-                                        {filteredUsers.filter(u => !selectedRecipients.find(r => r.uid === u.uid)).map((u) => (
-                                            <button
-                                                key={u.uid}
-                                                type="button"
-                                                onClick={() => {
-                                                    setSelectedRecipients(prev => [...prev, u]);
-                                                    setSearchQuery("");
-                                                    setIsSearching(false);
-                                                }}
-                                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-left transition-colors first:rounded-t-xl last:rounded-b-xl"
-                                            >
-                                                <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 text-xs font-black shrink-0 overflow-hidden border border-slate-200">
-                                                    {(u.profileImage || u.photoURL) ? (
-                                                        <img src={u.profileImage || u.photoURL} alt="" className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        (u.displayName || u.name || u.email).charAt(0)
-                                                    )}
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-black text-slate-800 truncate">{u.displayName || u.name || 'No Name'}</p>
-                                                    <p className="text-[10px] text-slate-400 font-bold truncate">{u.email}</p>
-                                                </div>
-                                            </button>
-                                        ))}
-                                        {filteredUsers.filter(u => !selectedRecipients.find(r => r.uid === u.uid)).length === 0 && (
-                                            <div className="p-4 text-center text-slate-400 text-xs font-bold italic">No matching clients found</div>
-                                        )}
-                                    </div>
-                                )}
+                                ))}
                             </div>
                         )}
+
+                        {/* Form Fields: Title, Body, Action */}
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Notification Title <span className="text-red-500">*</span></label>
+                                    <input
+                                        required
+                                        type="text"
+                                        value={title}
+                                        onChange={(e) => setTitle(e.target.value)}
+                                        placeholder="e.g. Project Update Received"
+                                        className="w-full bg-white border-2 border-slate-100 rounded-2xl px-5 py-4 text-sm font-bold text-slate-700 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all shadow-sm"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Redirect URL (Optional)</label>
+                                    <input
+                                        type="text"
+                                        value={clickAction}
+                                        onChange={(e) => setClickAction(e.target.value)}
+                                        placeholder="e.g. /dashboard/payments"
+                                        className="w-full bg-white border-2 border-slate-100 rounded-2xl px-5 py-4 text-sm font-bold text-slate-700 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all shadow-sm"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Message Content <span className="text-red-500">*</span></label>
+                                <textarea
+                                    required
+                                    value={body}
+                                    onChange={(e) => setBody(e.target.value)}
+                                    placeholder="Type your detailed message here... (This supports multiple lines)"
+                                    className="w-full bg-white border-2 border-slate-100 rounded-3xl p-6 min-h-[140px] focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none resize-none text-slate-700 font-medium text-base shadow-sm"
+                                />
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Message Content</label>
-                        <textarea
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            placeholder="Type your message here..."
-                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-6 min-h-[120px] focus:ring-2 focus:ring-blue-500 outline-none resize-none text-slate-700 font-medium text-sm"
-                        />
-                    </div>
-
-                    <div className="flex justify-end">
+                    <div className="flex justify-end pt-2">
                         <button
                             type="submit"
-                            disabled={loading || !newMessage.trim() || (targetType === "Client" && selectedRecipients.length === 0)}
-                            className="flex items-center gap-2 bg-blue-600 text-white px-8 py-3.5 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-700 disabled:opacity-50 transition-all shadow-xl shadow-blue-500/20 active:scale-[0.98]"
+                            disabled={loading || !title.trim() || !body.trim() || (targetType === "Client" && selectedRecipients.length === 0)}
+                            className="group flex items-center gap-3 bg-slate-900 hover:bg-black text-white px-10 py-4 rounded-[2rem] font-black text-base uppercase tracking-widest shadow-2xl shadow-slate-200 disabled:opacity-50 transition-all active:scale-[0.98] ring-offset-2 focus:ring-2 focus:ring-slate-900"
                         >
-                            {loading ? <RefreshCw className="animate-spin" size={18} /> : <>Send Notification <Send size={16} /></>}
+                            {loading ? (
+                                <RefreshCw className="animate-spin" size={20} />
+                            ) : (
+                                <>
+                                    Dispatch Notification 
+                                    <div className="p-1.5 bg-white/10 rounded-full group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform">
+                                        <Send size={18} />
+                                    </div>
+                                </>
+                            )}
                         </button>
                     </div>
                 </form>
@@ -2357,21 +2445,33 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
                                     </div>
                                 </div>
 
-                                {/* Message Area: Full Width */}
-                                <div className="space-y-2">
-                                    {notif.message.split('\n').map((line: string, idx: number) => line.trim() && (
-                                        <p
-                                            key={idx}
-                                            className={cn(
-                                                "text-sm leading-relaxed whitespace-pre-wrap",
-                                                idx === 0
-                                                    ? "font-black text-slate-800 border-b border-slate-100/50 pb-2 mb-3 text-base"
-                                                    : "text-slate-600 font-medium"
+                                <div className="space-y-4">
+                                    {(notif.title || notif.message) && (
+                                        <div className="flex flex-col gap-2">
+                                            {notif.title && (
+                                                <h4 className="font-black text-slate-800 text-lg leading-tight">
+                                                    {notif.title}
+                                                </h4>
                                             )}
-                                        >
-                                            {line}
-                                        </p>
-                                    ))}
+                                            <p className="text-slate-600 font-medium text-sm leading-relaxed whitespace-pre-wrap">
+                                                {notif.message}
+                                            </p>
+                                        </div>
+                                    )}
+                                    
+                                    {notif.clickAction && (
+                                        <div className="flex">
+                                            <a 
+                                                href={notif.clickAction} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-2 text-[10px] font-black text-blue-600 hover:text-blue-700 bg-blue-50/50 hover:bg-blue-100 px-4 py-2 rounded-2xl border border-blue-100 transition-all active:scale-95"
+                                            >
+                                                <ExternalLink size={12} />
+                                                Redirection Link: <span className="underline decoration-blue-200">{notif.clickAction.length > 40 ? notif.clickAction.substring(0, 40) + "..." : notif.clickAction}</span>
+                                            </a>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex items-center gap-2 pt-2 border-t border-slate-50/50">

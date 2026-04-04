@@ -1,10 +1,13 @@
 "use client";
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, updateDoc } from "firebase/firestore";
 import { useEffect } from "react";
 import { requestPermission, getFCMToken, onForegroundMessage } from "@/lib/notifications";
 
 const NotificationHandler = () => {
     useEffect(() => {
-        const setupNotifications = async () => {
+        const setupNotifications = async (user: any) => {
             // Step 1: Handle permission and token generation
             const hasPermission = await requestPermission();
             
@@ -13,6 +16,20 @@ const NotificationHandler = () => {
                 const token = await getFCMToken();
                 if (token) {
                     console.log("Successfully retrieved FCM Device Token: ", token);
+                    
+                    // Store the token in Firestore for this user
+                    if (user?.uid) {
+                        try {
+                            const userRef = doc(db, "users", user.uid);
+                            await updateDoc(userRef, { 
+                                fcmToken: token,
+                                lastTokenUpdate: new Date().toISOString()
+                            });
+                            console.log("FCM Token stored in database for user:", user.email);
+                        } catch (err) {
+                            console.error("Error storing FCM token:", err);
+                        }
+                    }
                 }
             }
             
@@ -20,8 +37,14 @@ const NotificationHandler = () => {
             onForegroundMessage();
         };
 
-        // Run setup once the component mounts
-        setupNotifications();
+        // Listen for auth state to handle logged-in users
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                setupNotifications(user);
+            }
+        });
+
+        return () => unsubscribe();
     }, []);
 
     // This component does not render any visual output
