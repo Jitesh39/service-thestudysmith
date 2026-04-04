@@ -2,26 +2,58 @@ import { NextRequest, NextResponse } from "next/server";
 import * as admin from "firebase-admin";
 
 // Initialize Firebase Admin SDK
-// This only initializes it once
-if (!admin.apps.length) {
-  try {
-    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-    
-    if (serviceAccount) {
-        // Parse the JSON string from environment variable
-        const parsedServiceAccount = JSON.parse(serviceAccount);
-        admin.initializeApp({
-            credential: admin.credential.cert(parsedServiceAccount),
-        });
-    } else {
-        // Fallback for local development if running on GCP/Firebase hosting
-        // or if credentials are set via GOOGLE_APPLICATION_CREDENTIALS env var
-        admin.initializeApp();
+const initializeFirebaseAdmin = () => {
+    if (admin.apps.length > 0) return;
+
+    try {
+        const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+        
+        // Strategy 1: Full JSON string from environment variable
+        if (serviceAccountJson) {
+            const parsedAccount = typeof serviceAccountJson === 'string' 
+                ? JSON.parse(serviceAccountJson.replace(/\\n/g, '\n')) 
+                : serviceAccountJson;
+                
+            admin.initializeApp({
+                credential: admin.credential.cert(parsedAccount),
+                projectId: parsedAccount.project_id
+            });
+            console.log("Firebase Admin initialized via JSON Service Account.");
+            return;
+        }
+
+        // Strategy 2: Individual variables (Easier for local dev)
+        const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+        const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+        const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+
+        if (projectId && clientEmail && privateKey) {
+            admin.initializeApp({
+                credential: admin.credential.cert({
+                    projectId,
+                    clientEmail,
+                    privateKey: privateKey.replace(/\\n/g, '\n'),
+                }),
+                projectId
+            });
+            console.log("Firebase Admin initialized via individual credentials.");
+            return;
+        }
+
+        // Strategy 3: Default application credentials (GCP/Firebase hosting)
+        if (process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.K_SERVICE) {
+            admin.initializeApp();
+            console.log("Firebase Admin initialized via Default Application Credentials.");
+        } else {
+            console.warn("⚠️ Firebase Admin credentials NOT detected. Ensure FIREBASE_SERVICE_ACCOUNT or individual ENV variables are set.");
+        }
+    } catch (error) {
+        console.error("Firebase Admin initialization error:", error);
     }
-  } catch (error) {
-    console.error("Firebase Admin initialization error:", error);
-  }
 }
+
+// Execute initialization
+initializeFirebaseAdmin();
 
 export async function POST(req: NextRequest) {
   try {

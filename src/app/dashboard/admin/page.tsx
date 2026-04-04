@@ -59,7 +59,7 @@ import {
 } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import BlogManagementSection from "@/components/BlogManagementSection";
-import { getFCMToken } from "@/lib/notifications";
+import { getFCMToken, requestPermission } from "@/lib/notifications";
 
 const getTimeGreeting = () => {
     const hour = new Date().getHours();
@@ -2062,10 +2062,17 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
     const [loading, setLoading] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
     const [myToken, setMyToken] = useState<string | null>(null);
+    const [isSyncing, setIsSyncing] = useState(false);
 
     const isTeamBroadcast = targetType === "Team Member";
     const isClientBroadcast = targetType === "All Client";
     const isBroadcast = isTeamBroadcast || isClientBroadcast;
+
+    const checkToken = async () => {
+        const token = await getFCMToken();
+        setMyToken(token);
+        return token;
+    };
 
     useEffect(() => {
         const q = query(collection(db, "notifications"), orderBy("timestamp", "desc"), limit(50));
@@ -2074,14 +2081,36 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
         });
 
         // Get own token for status display
-        const checkToken = async () => {
-            const token = await getFCMToken();
-            setMyToken(token);
-        };
         checkToken();
 
         return () => unsubscribe();
     }, []);
+
+    const handleReSync = async () => {
+        setIsSyncing(true);
+        try {
+            const hasPermission = await requestPermission();
+            if (hasPermission) {
+                const refreshedToken = await checkToken();
+                if (refreshedToken && user?.uid) {
+                    await setDoc(doc(db, "users", user.uid), {
+                        fcmToken: refreshedToken,
+                        lastTokenUpdate: new Date().toISOString()
+                    }, { merge: true });
+                    alert("Device synchronization complete! Your token is now up-to-date in the database.");
+                } else {
+                    alert("Could not generate a new token. Check browser console.");
+                }
+            } else {
+                alert("Permission denied. Enable notifications in browser settings.");
+            }
+        } catch (error) {
+            console.error("Sync error:", error);
+            alert("Error during synchronization.");
+        } finally {
+            setIsSyncing(false);
+        }
+    };
 
     const filteredUsers = allUsers.filter(u => {
         const queryValue = searchQuery.toLowerCase();
@@ -2238,11 +2267,23 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-50 rounded-2xl border border-slate-100">
-                        <div className={`w-2.5 h-2.5 rounded-full ${myToken ? 'bg-green-500 animate-pulse' : 'bg-red-400'}`}></div>
-                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                            Your Status: {myToken ? 'Listening' : 'No Token Found'}
-                        </span>
+                    <div className="flex flex-col items-end gap-3 translate-y-[-10px]">
+                        <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm transition-all hover:bg-slate-100/50">
+                            <div className={`w-2.5 h-2.5 rounded-full ${myToken ? 'bg-green-500 shadow-lg shadow-green-200' : 'bg-red-400 shadow-lg shadow-red-200'} ${myToken ? 'animate-pulse' : ''}`}></div>
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">
+                                {myToken ? 'PUSH ACTIVE' : 'PUSH OFFLINE'}
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleReSync}
+                            disabled={isSyncing}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all
+                                ${isSyncing ? 'bg-slate-100 text-slate-400' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white hover:shadow-lg hover:shadow-blue-200'}`}
+                        >
+                            {isSyncing ? <RefreshCw className="animate-spin" size={12} /> : <RefreshCw size={12} />}
+                            {isSyncing ? 'Synchronizing...' : 'Snyc Device Token'}
+                        </button>
                     </div>
                 </div>
 
