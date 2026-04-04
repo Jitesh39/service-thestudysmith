@@ -22,6 +22,7 @@ import {
     onSnapshot
 } from "firebase/firestore";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 import {
     LayoutDashboard,
     Users,
@@ -116,7 +117,7 @@ const AdminOverview = ({
                             <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 mb-3 group-hover/card:scale-110 transition-transform duration-500">
                                 <Users size={20} />
                             </div>
-                            <p className="text-slate-400 text-[9px] font-black uppercase tracking-[0.2em] mb-1">Total Users</p>
+                            <p className="text-slate-00 text-[9px] font-black uppercase tracking-[0.2em] mb-1">Total Users</p>
                             <p className="text-xl md:text-3xl font-black text-slate-900">{totalUsers}</p>
                         </div>
                         <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 hover:border-green-200 hover:shadow-xl hover:shadow-green-500/10 transition-all duration-500 transform hover:-translate-y-2 flex flex-col items-center text-center group/card">
@@ -2173,13 +2174,163 @@ const TeamMessagesSection = ({ user, allUsers = [] }: { user: any, allUsers?: an
 
 
 
-export default function AdminDashboard() {
+const NotificationsSection = ({ user }: { user: any }) => {
+    const [notifications, setNotifications] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (!user?.uid) return;
+
+        // Query for broadcast messages OR personal notifications
+        const q = query(
+            collection(db, "notifications"),
+            where("receiverType", "==", "team"),
+            orderBy("timestamp", "desc")
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // Filter locally to match "all_team" or specific UID
+            setNotifications(list.filter((n: any) => n.receiverId === "all_team" || n.receiverId === user.uid));
+        });
+        return () => unsubscribe();
+    }, [user?.uid]);
+
+    const markAsRead = async (id: string, currentStatus: boolean) => {
+        if (currentStatus) return;
+        try {
+            await updateDoc(doc(db, "notifications", id), { isRead: true });
+        } catch (error) {
+            console.error("Error marking read:", error);
+        }
+    };
+
+    return (
+        <div className="max-w-4xl space-y-6 pb-10">
+            <div className="hidden md:flex bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-100 items-center justify-between">
+                <div>
+                    <h2 className="text-3xl font-black text-slate-800">Admin <span className="text-blue-600">Notifications</span></h2>
+                    <p className="text-slate-500 mt-1 font-medium italic">Updates and direct messages from administration.</p>
+                </div>
+                <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                    <Bell size={24} />
+                </div>
+            </div>
+
+            <div className="space-y-4">
+                {notifications.length > 0 ? (
+                    notifications.map((notif) => (
+                        <div
+                            key={notif.id}
+                            onClick={() => markAsRead(notif.id, notif.isRead)}
+                            className={`group bg-white p-4 md:p-6 rounded-2xl shadow-sm border transition-all duration-300 cursor-pointer hover:shadow-xl hover:shadow-blue-500/5 relative overflow-hidden flex flex-col gap-5 ${notif.isRead ? 'border-slate-100 opacity-75' : 'border-blue-200 ring-1 ring-blue-100'}`}
+                        >
+                            {/* Header Row */}
+                            <div className="flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex-shrink-0">
+                                        <div className="w-10 h-10 rounded-full bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center overflow-hidden">
+                                            {notif.senderPhoto ? (
+                                                <img src={notif.senderPhoto} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center text-white text-xs font-black italic">
+                                                    {(notif.senderName || 'A').charAt(0)}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-black text-slate-800">{notif.senderName || "Admin"}</span>
+                                            <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-blue-100">
+                                                ADMIN
+                                            </span>
+                                        </div>
+                                        {notif.receiverId === "all_team" && (
+                                            <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded-md text-[9px] font-black uppercase tracking-widest border border-green-100 leading-none">Team Broadcast</span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="hidden sm:block text-xs font-black text-slate-900 uppercase tracking-widest tabular-nums font-mono">
+                                        {notif.timestamp?.toDate ? notif.timestamp.toDate().toLocaleString('en-US', {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                            hour: 'numeric',
+                                            minute: 'numeric',
+                                            hour12: true
+                                        }) : 'Just Now'}
+                                    </div>
+                                    {!notif.isRead && (
+                                        <div className="text-blue-600 animate-pulse">
+                                            <CheckCircle size={14} />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Message Row - Wide */}
+                            <div className="space-y-2">
+                                {notif.message.split('\n').map((line: string, idx: number) => line.trim() && (
+                                    <p
+                                        key={idx}
+                                        className={cn(
+                                            "text-sm leading-relaxed whitespace-pre-wrap",
+                                            idx === 0
+                                                ? "font-black text-slate-800 border-b border-slate-100/50 pb-2 mb-3 text-base"
+                                                : (notif.isRead ? "text-slate-500 font-medium" : "text-slate-700 font-bold")
+                                        )}
+                                    >
+                                        {line}
+                                    </p>
+                                ))}
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <div className="bg-white p-20 rounded-[32px] border-2 border-dashed border-slate-100 text-center">
+                        <Bell className="mx-auto text-slate-200 mb-4" size={48} />
+                        <p className="text-slate-400 font-bold text-lg">No notifications for you yet.</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+export default function TeamDashboard() {
     const [activeSection, setActiveSection] = useState<string>("");
+    const [unreadCount, setUnreadCount] = useState(0);
 
     // Persist active section on refresh
     useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const sectionParam = params.get("section");
         const savedSection = localStorage.getItem("adminActiveSection");
-        setActiveSection(savedSection || "overview");
+
+        if (sectionParam) {
+            setActiveSection(sectionParam);
+            localStorage.setItem("adminActiveSection", sectionParam);
+        } else {
+            setActiveSection(savedSection || "overview");
+        }
+    }, []);
+
+    // Unread count listener
+    useEffect(() => {
+        if (!auth.currentUser?.uid) return;
+        const q = query(
+            collection(db, "notifications"),
+            where("receiverType", "==", "team"),
+            where("isRead", "==", false)
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const list = snapshot.docs.map(doc => doc.data());
+            const count = list.filter((n: any) => n.receiverId === "all_team" || n.receiverId === auth.currentUser?.uid).length;
+            setUnreadCount(count);
+        });
+        return () => unsubscribe();
     }, []);
 
     useEffect(() => {
@@ -2409,7 +2560,7 @@ export default function AdminDashboard() {
 
     const menuItems = [
         { id: "overview", label: "Dashboard", icon: LayoutDashboard },
-        { id: "team-updates", label: "Team Updates", icon: Bell },
+        { id: "notifications", label: "Notifications", icon: Bell, badge: true },
         { id: "projects", label: "Projects Tracker", icon: Briefcase },
         { id: "active-ids", label: "Active Client Projects", icon: Package },
         ...(user?.role === 'Team_Member' ? [] : [{ id: "users", label: "Users", icon: Users }]),
@@ -2525,7 +2676,7 @@ export default function AdminDashboard() {
             );
             case "projects": return <AdminProjects sheetUrl={sheetUrl} onUpdateUrl={handleUpdateSheetUrl} isSuperAdmin={isSuperAdmin} />;
             case "active-ids": return <AssignedProjectsSection projects={assignedProjects} users={allUsers} onDelete={handleDeleteProjectID} isSuperAdmin={isSuperAdmin} />;
-            case "team-updates": return <TeamMessagesSection user={user} allUsers={allUsers} />;
+            case "notifications": return <NotificationsSection user={user} />;
             case "users":
                 if (user?.role === 'Team_Member') return <div className="p-8 text-center text-red-500 font-bold">Access Denied: Admin Only</div>;
                 return <UsersSection users={allUsers} totalUsers={totalUsers} onDelete={handleDeleteUser} currentUserEmail={user?.email} />;
@@ -2566,13 +2717,20 @@ export default function AdminDashboard() {
                                 setActiveSection(item.id);
                                 setIsSidebarOpen(false);
                             }}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeSection === item.id
+                            className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors ${activeSection === item.id
                                 ? "bg-blue-600 text-white"
                                 : "text-slate-400 hover:bg-slate-800 hover:text-white"
                                 }`}
                         >
-                            <item.icon size={20} />
-                            <span className="font-medium">{item.label}</span>
+                            <div className="flex items-center gap-3">
+                                <item.icon size={20} />
+                                <span className="font-medium">{item.label}</span>
+                            </div>
+                            {item.id === "notifications" && unreadCount > 0 && (
+                                <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-bounce shadow-lg shadow-red-500/50">
+                                    {unreadCount}
+                                </span>
+                            )}
                         </button>
                     ))}
                     <hr className="my-4 border-slate-700/50" />

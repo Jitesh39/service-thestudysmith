@@ -4,8 +4,9 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, onSnapshot, setDoc, addDoc, serverTimestamp, orderBy, runTransaction, increment, limit, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, onSnapshot, setDoc, addDoc, updateDoc, serverTimestamp, orderBy, runTransaction, increment, limit, getDocs } from "firebase/firestore";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 import {
     LayoutDashboard,
     User,
@@ -25,7 +26,10 @@ import {
     RefreshCw,
     Send,
     Pencil,
-    Camera
+    Camera,
+    Copy,
+    Check,
+    IndianRupee
 } from "lucide-react";
 
 const uploadToCloudinary = async (file: File) => {
@@ -147,93 +151,207 @@ const OverviewSection = ({ user, projects, tickets, loading }: { user: any; proj
         </div>
     );
 };
+const PaymentModal = ({ isOpen, onClose, project }: { isOpen: boolean, onClose: () => void, project: any }) => {
+    const [copied, setCopied] = useState(false);
+    const upiId = "9525129168@ptyes";
 
-const PaymentsSection = ({ projects }: { projects: any[] }) => {
+    const handleCopy = () => {
+        navigator.clipboard.writeText(upiId);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    if (!isOpen) return null;
+
     return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
-                <div>
-                    <h2 className="text-3xl font-extrabold text-slate-900">Project <span className="text-blue-600">Payments</span></h2>
-                    <p className="text-slate-500 mt-2 font-medium">Track your payment status, outstanding balances, and transaction remarks for all your active projects.</p>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-8 duration-500">
+                <div className="p-4 pb-2 flex justify-between items-start">
+                    <div>
+                        <h3 className="text-2xl font-black text-slate-900 leading-tight">Complete Your <br /><span className="text-blue-600">Payment</span></h3>
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-2">{project?.projectName || "Project Payment"}</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors group">
+                        <X size={20} className="text-slate-400 group-hover:text-slate-900" />
+                    </button>
                 </div>
-            </div>
 
-            {projects.length > 0 ? (
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                    <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-white">
-                        <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
-                            <CreditCard size={20} className="text-blue-600" />
-                            Recent Payment Status
-                        </h3>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1 rounded-full">
-                            {projects.length} Total Projects
-                        </span>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-50/50 border-b border-slate-50">
-                                <tr>
-                                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Project ID</th>
-                                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Payment Status</th>
-                                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Agreement Remark</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {projects.map((p, i) => {
-                                    const status = p.paymentStatus?.toLowerCase();
-                                    const isPaid = status === 'paid' || status === 'full paid';
-                                    const isHalf = status?.includes('50%');
-                                    const isPending = status === 'pending';
+                <div className="p-5 md:p-8 pt-0 space-y-6 md:space-y-8">
+                    <div className="bg-slate-50 p-4 md:p-6 rounded-3xl border border-dashed border-slate-200 text-center space-y-3 md:space-y-4">
+                        <div className="space-y-1">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">UPI ID</p>
+                            <p className="text-xl font-black text-slate-900 tracking-tight">{upiId}</p>
+                        </div>
 
-                                    return (
-                                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="p-5 font-mono text-sm font-bold text-blue-600">{p.projectId || p.id}</td>
-                                            <td className="p-5">
-                                                <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${isPaid ? 'bg-green-100 text-green-700' :
-                                                    isHalf ? 'bg-blue-100 text-blue-700' :
-                                                        'bg-yellow-100 text-yellow-700'
-                                                    }`}>
-                                                    {isPaid ? 'Cleared' : isHalf ? 'Half Paid' : isPending ? 'Pending' : p.paymentStatus || 'Awaited'}
-                                                </span>
-                                            </td>
-                                            <td className="p-5 text-sm font-medium text-slate-500 italic">
-                                                {isPaid ? 'No balance remaining.' :
-                                                    isHalf ? '50% payment received.' :
-                                                        isPending ? 'Initial payment is awaited.' : 'Contact support for details.'}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            ) : (
-                <div className="bg-white p-12 rounded-3xl border border-dashed border-slate-200 text-center space-y-4">
-                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-200">
-                        <CreditCard size={40} />
-                    </div>
-                    <div className="space-y-2">
-                        <h4 className="text-xl font-bold text-slate-800">No Projects Found</h4>
-                        <p className="text-slate-500 max-w-xs mx-auto text-sm">Add a project using your Project ID to see payment statuses here.</p>
-                    </div>
-                </div>
-            )}
+                        <div className="h-[1px] w-12 bg-slate-200 mx-auto"></div>
 
-            <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100 flex items-start gap-4">
-                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                    <MessageSquare size={18} />
-                </div>
-                <div>
-                    <h4 className="font-bold text-blue-900 text-sm mb-1">Payment Assistance</h4>
-                    <p className="text-blue-700/80 text-xs font-medium leading-relaxed">
-                        If you notice any discrepancy in your payment status, please raise a ticket in the Support section or contact your project manager directly.
-                    </p>
+                        <div className="space-y-1">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Total Amount</p>
+                            <div className="flex items-center justify-center gap-1 text-3xl font-black text-blue-600">
+                                <span className="text-xl">₹</span>
+                                {project?.payment || "0"}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <button
+                            onClick={handleCopy}
+                            className={`w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 border shadow-lg ${copied
+                                ? 'bg-green-700 border-green-700 text-white shadow-green-100'
+                                : 'bg-green-600 border-green-600 text-white shadow-green-200 hover:bg-green-700'
+                                }`}
+                        >
+                            {copied ? <Check size={18} /> : <Copy size={18} />}
+                            {copied ? "UPI ID Copied!" : "Copy UPI ID"}
+                        </button>
+
+                        <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 flex items-start gap-3">
+                            <div className="p-1.5 bg-blue-100 text-blue-600 rounded-lg shrink-0">
+                                <CreditCard size={14} />
+                            </div>
+                            <p className="text-[11px] text-blue-800/80 font-bold leading-relaxed">
+                                Pay via any UPI app and share the payment screenshot with your TheStudySmith team member.
+
+                            </p>
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={onClose}
+                        className="w-full py-4 text-slate-400 font-bold text-xs uppercase tracking-widest hover:text-slate-900 transition-colors"
+                    >
+                        Close Window
+                    </button>
                 </div>
             </div>
         </div>
     );
 };
+
+const PaymentsSection = ({ projects }: { projects: any[] }) => {
+    const [selectedProject, setSelectedProject] = useState<any>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
+    const handlePayNow = (project: any) => {
+        setSelectedProject(project);
+        setIsModalOpen(true);
+    };
+
+    return (
+        <>
+            <PaymentModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                project={selectedProject}
+            />
+
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
+                    <div>
+                        <h2 className="text-3xl font-extrabold text-slate-900">Project <span className="text-blue-600">Payments</span></h2>
+                        <p className="text-slate-500 mt-2 font-medium">Track your payment status, outstanding balances, and transaction remarks for all your active projects.</p>
+                    </div>
+                </div>
+
+                {projects.length > 0 ? (
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-white">
+                            <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                                <CreditCard size={20} className="text-blue-600" />
+                                Recent Payment Status
+                            </h3>
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1 rounded-full">
+                                {projects.length} Total Projects
+                            </span>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-50/50 border-b border-slate-50">
+                                    <tr>
+                                        <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Project ID</th>
+                                        <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Payment Status</th>
+                                        <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Action</th>
+                                        <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Agreement Remark</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {projects.map((p, i) => {
+                                        const status = p.paymentStatus?.toLowerCase();
+                                        const isPaid = status === 'paid' || status === 'full paid';
+                                        const isHalf = status?.includes('50%');
+                                        const isPending = status === 'pending';
+
+                                        return (
+                                            <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                                                <td className="p-5 font-mono text-sm font-bold text-blue-600">{p.projectId || p.id}</td>
+                                                <td className="p-5">
+                                                    <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${isPaid ? 'bg-green-100 text-green-700' :
+                                                        isHalf ? 'bg-blue-100 text-blue-700' :
+                                                            'bg-yellow-100 text-yellow-700'
+                                                        }`}>
+                                                        {isPaid ? 'Cleared' : isHalf ? 'Half Paid' : isPending ? 'Pending' : p.paymentStatus || 'Awaited'}
+                                                    </span>
+                                                </td>
+                                                <td className="p-5 text-center">
+                                                    {isPaid ? (
+                                                        <button
+                                                            disabled
+                                                            className="px-4 py-2 bg-transparent text-slate-300 text-[10px] font-black uppercase tracking-widest rounded-xl cursor-not-allowed"
+                                                        >
+                                                            Cleared
+                                                        </button>
+                                                    ) : (isPending || isHalf) ? (
+                                                        <button
+                                                            onClick={() => handlePayNow(p)}
+                                                            className="px-4 py-2 bg-green-600 border border-green-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-green-700 transition-all active:scale-95 shadow-lg shadow-green-100"
+                                                        >
+                                                            Pay Now
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic">N/A</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-5 text-sm font-medium text-slate-500 italic">
+                                                    {isPaid ? 'No balance remaining.' :
+                                                        isHalf ? '50% payment received.' :
+                                                            isPending ? 'Initial payment is awaited.' : 'Contact support for details.'}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="bg-white p-12 rounded-3xl border border-dashed border-slate-200 text-center space-y-4">
+                        <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-200">
+                            <CreditCard size={40} />
+                        </div>
+                        <div className="space-y-2">
+                            <h4 className="text-xl font-bold text-slate-800">No Projects Found</h4>
+                            <p className="text-slate-500 max-w-xs mx-auto text-sm">Add a project using your Project ID to see payment statuses here.</p>
+                        </div>
+                    </div>
+                )}
+
+                <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100 flex items-start gap-4">
+                    <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                        <MessageSquare size={18} />
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-blue-900 text-sm mb-1">Payment Assistance</h4>
+                        <p className="text-blue-700/80 text-xs font-medium leading-relaxed">
+                            If you notice any discrepancy in your payment status, please raise a ticket in the Support section or contact your project manager directly.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </>
+    );
+};
+;
 
 
 const ProjectsSection = ({ user, loading, projects }: { user: any; loading: boolean; projects: any[] }) => {
@@ -538,13 +656,13 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
     );
 };
 
-const NotificationsSection = () => {
+const QuickGuideSection = () => {
     return (
         <div className="max-w-4xl space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h2 className="text-3xl font-extrabold text-slate-900">System <span className="text-blue-600">Notifications</span></h2>
+                        <h2 className="text-3xl font-extrabold text-slate-900">Quick <span className="text-blue-600">Guide</span></h2>
                         <p className="text-slate-500 mt-2 font-medium italic">Stay updated with the latest platform changes and follow the guide to manage your account.</p>
                     </div>
                 </div>
@@ -625,7 +743,7 @@ const NotificationsSection = () => {
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4 group hover:border-blue-200 transition-all">
                             <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center text-green-600 font-extrabold text-xl group-hover:rotate-12 transition-transform">3</div>
                             <h3 className="text-xl font-bold text-slate-800">Payments</h3>
-                            <p className="text-sm text-slate-500 font-medium leading-relaxed">Securely track project balances and transaction history provided by our finance team.</p>
+                            <p className="text-sm text-slate-500 font-medium leading-relaxed">Click on <span className="text-blue-600 font-bold">"Pay Now"</span> for any project, and after successful payment completion, share the transaction screenshot. Administration will verify and update your status after it.</p>
                         </div>
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4 group hover:border-blue-200 transition-all">
                             <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 font-extrabold text-xl group-hover:rotate-12 transition-transform">4</div>
@@ -639,6 +757,107 @@ const NotificationsSection = () => {
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    );
+};
+
+const NotificationsSection = ({ notifications, onMarkAsRead }: { notifications: any[], onMarkAsRead: (id: string) => void }) => {
+    return (
+        <div className="max-w-4xl space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
+            <div className="hidden md:flex bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8 flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 className="text-3xl font-extrabold text-slate-900">Recent <span className="text-blue-600">Notifications</span></h2>
+                    <p className="text-slate-500 mt-2 font-medium italic">Direct updates and messages from your project manager.</p>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-xl font-bold text-xs">
+                    <Bell size={16} /> {notifications.length} Total
+                </div>
+            </div>
+
+            <div className="space-y-4">
+                {notifications.length > 0 ? (
+                    notifications.map((n) => (
+                        <div
+                            key={n.id}
+                            onClick={() => !n.isRead && onMarkAsRead(n.id)}
+                            className={`bg-white p-4 md:p-5 rounded-2xl border transition-all cursor-pointer group hover:border-blue-300 relative overflow-hidden ${n.isRead ? 'border-slate-100 shadow-sm' : 'border-blue-200 shadow-md ring-1 ring-blue-50'}`}
+                        >
+                            <div className="flex flex-col gap-5">
+                                {/* Header: Profile + Info Group */}
+                                <div className="flex items-center justify-between gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex-shrink-0">
+                                            <div className="w-10 h-10 rounded-full bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center overflow-hidden">
+                                                {n.senderPhoto ? (
+                                                    <img src={n.senderPhoto} alt="" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-white text-sm font-black italic">
+                                                        {(n.senderName || 'A').charAt(0)}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                            <h4 className={`text-sm md:text-base font-black tracking-tight ${n.isRead ? 'text-slate-600' : 'text-slate-900'}`}>
+                                                {n.senderName || "Admin"}
+                                            </h4>
+                                            <div className="flex items-center gap-2">
+                                                <span className="px-2 py-0.5 bg-[#E9D5FF] text-[#6D28D9] rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest leading-none">
+                                                    ADMIN
+                                                </span>
+                                                {n.receiverId === "all_client" && (
+                                                    <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md text-[9px] font-black uppercase tracking-widest border border-blue-100 leading-none">Broadcast</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="hidden sm:block text-xs font-black text-slate-900 uppercase tracking-widest tabular-nums">
+                                        {n.timestamp?.toDate ? n.timestamp.toDate().toLocaleString('en-US', {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                            hour: 'numeric',
+                                            minute: 'numeric',
+                                            hour12: true
+                                        }) : 'Just Now'}
+                                    </div>
+                                </div>
+
+                                {/* Content Section: Full Width Message */}
+                                <div className="space-y-2">
+                                    {!n.isRead && (
+                                        <div className="inline-flex px-2 py-0.5 bg-green-500 text-white rounded-md text-[8px] font-black uppercase tracking-widest animate-pulse mb-1">New Update</div>
+                                    )}
+                                    {n.message.split('\n').map((line: string, idx: number) => line.trim() && (
+                                        <p
+                                            key={idx}
+                                            className={cn(
+                                                "text-sm leading-relaxed whitespace-pre-wrap",
+                                                idx === 0
+                                                    ? "font-black text-slate-900 border-b border-slate-100/50 pb-2 mb-3 text-base"
+                                                    : (n.isRead ? 'text-slate-500 font-medium' : 'text-slate-700 font-bold')
+                                            )}
+                                        >
+                                            {line}
+                                        </p>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <div className="bg-white p-20 rounded-3xl border border-dashed border-slate-200 text-center space-y-4">
+                        <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-200">
+                            <Bell size={40} />
+                        </div>
+                        <div className="space-y-1">
+                            <h4 className="text-xl font-bold text-slate-800">No Notifications</h4>
+                            <p className="text-slate-500 text-sm font-medium">You're all caught up! No new updates from admin.</p>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -1040,8 +1259,16 @@ export default function ClientDashboard() {
     const [activeSection, setActiveSection] = useState<string>("");
 
     useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const sectionParam = params.get("section");
         const savedSection = localStorage.getItem("clientActiveSection");
-        setActiveSection(savedSection || "overview");
+
+        if (sectionParam) {
+            setActiveSection(sectionParam);
+            localStorage.setItem("clientActiveSection", sectionParam);
+        } else {
+            setActiveSection(savedSection || "overview");
+        }
     }, []);
 
     useEffect(() => {
@@ -1054,6 +1281,8 @@ export default function ClientDashboard() {
     const [user, setUser] = useState<any>(null);
     const [projects, setProjects] = useState<any[]>([]);
     const [tickets, setTickets] = useState<any[]>([]);
+    const [notifications, setNotifications] = useState<any[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
@@ -1137,7 +1366,6 @@ export default function ClientDashboard() {
                 const snapshot = await getDocs(q);
                 const ticketList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
 
-                // Sort client-side to avoid complex index requirements if not needed
                 ticketList.sort((a, b) => {
                     const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
                     const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
@@ -1153,14 +1381,48 @@ export default function ClientDashboard() {
         fetchTickets();
     }, [user?.email]);
 
+    useEffect(() => {
+        if (!user?.uid) return;
+
+        // Listen for direct notifications OR global broadcast announcements
+        const q = query(
+            collection(db, "notifications"),
+            where("receiverId", "in", [user.uid, "all_client"]),
+            orderBy("timestamp", "desc")
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setNotifications(list);
+            const unread = list.filter((n: any) => !n.isRead).length;
+            setUnreadCount(unread);
+        }, (error) => {
+            console.error("Notifications listener error:", error);
+        });
+
+        return () => unsubscribe();
+    }, [user?.uid]);
+
+    const handleMarkAsRead = async (notificationId: string) => {
+        try {
+            const notifRef = doc(db, "notifications", notificationId);
+            await updateDoc(notifRef, {
+                isRead: true
+            });
+        } catch (error) {
+            console.error("Error marking as read:", error);
+        }
+    };
+
     const menuItems = [
         { id: "overview", label: "Overview", icon: LayoutDashboard },
         { id: "profile", label: "My Profile", icon: User },
         { id: "projects", label: "My Projects", icon: Package },
         { id: "payments", label: "Payments", icon: CreditCard },
-        { id: "documents", label: "Documents", icon: FileText },
+        { id: "notifications", label: "Notifications", icon: Bell, badge: unreadCount },
         { id: "support", label: "Support", icon: MessageSquare },
-        { id: "notifications", label: "Notifications", icon: Bell },
+        { id: "quick-guide", label: "Quick Guide", icon: FileText },
+        { id: "documents", label: "Documents", icon: FileText },
     ];
 
     const renderContent = () => {
@@ -1169,9 +1431,10 @@ export default function ClientDashboard() {
             case "profile": return <ProfileSection user={user} loading={loading} />;
             case "projects": return <ProjectsSection user={user} loading={loading} projects={projects} />;
             case "payments": return <PaymentsSection projects={projects} />;
-            case "documents": return <DocumentsSection />;
+            case "notifications": return <NotificationsSection notifications={notifications} onMarkAsRead={handleMarkAsRead} />;
             case "support": return <SupportSection user={user} tickets={tickets} />;
-            case "notifications": return <NotificationsSection />;
+            case "quick-guide": return <QuickGuideSection />;
+            case "documents": return <DocumentsSection />;
             default: return <div className="p-8 text-center text-slate-500">Section under construction</div>;
         }
     };
@@ -1187,10 +1450,17 @@ export default function ClientDashboard() {
                                 setActiveSection(item.id);
                                 setIsSidebarOpen(false);
                             }}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeSection === item.id ? "bg-blue-600 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}
+                            className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors ${activeSection === item.id ? "bg-blue-600 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}
                         >
-                            <item.icon size={20} />
-                            <span className="font-medium">{item.label}</span>
+                            <div className="flex items-center gap-3">
+                                <item.icon size={20} />
+                                <span className="font-medium text-sm">{item.label}</span>
+                            </div>
+                            {(item as any).badge > 0 && (
+                                <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                                    {(item as any).badge}
+                                </span>
+                            )}
                         </button>
                     ))}
                     <button

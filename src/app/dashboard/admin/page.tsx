@@ -22,6 +22,7 @@ import {
     onSnapshot
 } from "firebase/firestore";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 import {
     LayoutDashboard,
     Users,
@@ -52,7 +53,8 @@ import {
     Bell,
     Send,
     Pencil,
-    FileText
+    FileText,
+    Search
 } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import BlogManagementSection from "@/components/BlogManagementSection";
@@ -738,6 +740,12 @@ const ProfileSection = ({ user, loading, teamMembers }: { user: any; loading: bo
                     createdAt: serverTimestamp()
                 });
             }
+
+            // Sync with users collection so other parts of the app see the image
+            await updateDoc(doc(db, "users", user.uid), {
+                profileImage: secure_url,
+                updatedAt: serverTimestamp()
+            }).catch(e => console.error("Failed to sync with users collection", e));
 
             // If user is also a team member, optionally update the team collection
             if (teamMember?.id) {
@@ -2040,128 +2048,347 @@ const ProjectPublishSection = () => {
     );
 };
 
-
-
-const TeamMessagesSection = ({ user, allUsers = [] }: { user: any, allUsers?: any[] }) => {
-    const [messages, setMessages] = useState<any[]>([]);
+const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUsers?: any[] }) => {
+    const [notifications, setNotifications] = useState<any[]>([]);
     const [newMessage, setNewMessage] = useState("");
+    const [targetType, setTargetType] = useState<"Team Member" | "Client" | "All Client">("Team Member");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [selectedRecipients, setSelectedRecipients] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
 
     useEffect(() => {
-        const q = query(collection(db, "team_messages"), orderBy("createdAt", "desc"), limit(50));
+        const q = query(collection(db, "notifications"), orderBy("timestamp", "desc"), limit(50));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setNotifications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         });
         return () => unsubscribe();
     }, []);
 
-    const handlePostMessage = async (e: React.FormEvent) => {
+    const filteredUsers = allUsers.filter(u => {
+        const queryValue = searchQuery.toLowerCase();
+        const name = (u.displayName || u.name || "").toLowerCase();
+        const email = (u.email || "").toLowerCase();
+
+        const matchesQuery = name.startsWith(queryValue) || email.startsWith(queryValue);
+
+        // Strictly exclude admin roles from receiving notifications
+        if (u.role === "admin") return false;
+
+        if (targetType === "Team Member") return matchesQuery && u.role === "Team_Member";
+        return matchesQuery;
+    });
+
+    const handlePostNotification = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newMessage.trim()) return;
 
+        const isTeamBroadcast = targetType === "Team Member";
+        const isClientBroadcast = targetType === "All Client";
+        const isBroadcast = isTeamBroadcast || isClientBroadcast;
+
+        if (!isBroadcast && selectedRecipients.length === 0) return;
+
         setLoading(true);
         try {
-            await addDoc(collection(db, "team_messages"), {
-                content: newMessage,
-                senderName: user.displayName || user.email,
-                senderEmail: user.email,
-                senderRole: user.role || "Team_Member",
-                createdAt: serverTimestamp()
-            });
+            if (isBroadcast) {
+                // Single broadcast document
+                await addDoc(collection(db, "notifications"), {
+                    message: newMessage,
+                    receiverId: isTeamBroadcast ? "all_team" : "all_client",
+                    receiverEmail: isTeamBroadcast ? "all_team@thestudysmith.com" : "all_client@thestudysmith.com",
+                    receiverName: isTeamBroadcast ? "All Team Members" : "All Clients",
+                    receiverImage: null,
+                    receiverType: isTeamBroadcast ? "team" : "client",
+                    senderId: user.uid,
+                    senderName: user.displayName || user.email,
+                    senderPhoto: user.profileImage || user.photoURL || null,
+                    isRead: false,
+                    timestamp: serverTimestamp()
+                });
+            } else {
+                // Multiple individual notifications
+                const batch = selectedRecipients.map(recipient => addDoc(collection(db, "notifications"), {
+                    message: newMessage,
+                    receiverId: recipient.uid,
+                    receiverEmail: recipient.email,
+                    receiverName: recipient.displayName || recipient.name || recipient.email,
+                    receiverImage: recipient.profileImage || recipient.photoURL || null,
+                    receiverType: "client",
+                    senderId: user.uid,
+                    senderName: user.displayName || user.email,
+                    senderPhoto: user.profileImage || user.photoURL || null,
+                    isRead: false,
+                    timestamp: serverTimestamp()
+                }));
+                await Promise.all(batch);
+            }
+
             setNewMessage("");
+            setSelectedRecipients([]);
+            setSearchQuery("");
+            alert(isBroadcast ? `Broadcast sent to ${isTeamBroadcast ? 'all team members' : 'all clients'}!` : `Notification sent to ${selectedRecipients.length} clients!`);
         } catch (error) {
-            console.error("Error posting message:", error);
-            alert("Failed to post message");
+            console.error("Error sending notification:", error);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleDeleteMessage = async (messageId: string) => {
-        if (!confirm("Are you sure you want to delete this message?")) return;
+    const handleDeleteNotification = async (notifId: string) => {
+        if (!confirm("Are you sure you want to delete this notification?")) return;
         try {
-            await deleteDoc(doc(db, "team_messages", messageId));
+            await deleteDoc(doc(db, "notifications", notifId));
         } catch (error) {
-            console.error("Error deleting message:", error);
-            alert("Failed to delete message");
+            console.error("Error deleting notification:", error);
         }
     };
 
     return (
-        <div className="max-w-4xl space-y-6 pb-10">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <h2 className="text-2xl font-bold text-slate-800 mb-2">Team Updates</h2>
-                <p className="text-slate-500 mb-6 font-medium text-sm">Share important notices and updates with the team.</p>
+        <div className="max-w-4xl space-y-8 pb-10">
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+                <div className="flex items-center gap-3 mb-8">
+                    <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-200">
+                        <Bell size={24} />
+                    </div>
+                    <div>
+                        <h2 className="text-2xl font-black text-slate-800">Send Notification</h2>
+                        <p className="text-slate-500 font-medium text-sm italic">Communicate with your team and clients instantly.</p>
+                    </div>
+                </div>
 
-                <form onSubmit={handlePostMessage} className="relative">
-                    <textarea
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Type your update here..."
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 min-h-[100px] focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none text-slate-700 placeholder:text-slate-400 font-medium"
-                    />
-                    <div className="mt-3 flex justify-end">
+                <form onSubmit={handlePostNotification} className="space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="space-y-3">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Send To</label>
+                            <div className="relative group">
+                                <select
+                                    value={targetType}
+                                    onChange={(e) => {
+                                        setTargetType(e.target.value as any);
+                                        setSelectedRecipients([]);
+                                        setSearchQuery("");
+                                    }}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold text-slate-700 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none appearance-none transition-all cursor-pointer hover:bg-white"
+                                >
+                                    <option value="Team Member">Team Member</option>
+                                    <option value="Client">Specific Client</option>
+                                    <option value="All Client">All Clients (Broadcast)</option>
+                                </select>
+                                <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                    <ChevronDown size={18} />
+                                </div>
+                            </div>
+                        </div>
+
+                        {targetType === "Team Member" ? (
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Targeting</label>
+                                <div className="flex items-center gap-3 bg-green-50 border border-green-100 rounded-xl px-4 py-3">
+                                    <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-white">
+                                        <Users size={16} />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-black text-green-700">Team Broadcast</span>
+                                        <span className="text-[10px] font-bold text-green-600/70 uppercase">Reaches All Team Members</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : targetType === "All Client" ? (
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Targeting</label>
+                                <div className="flex items-center gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+                                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white">
+                                        <Bell size={16} />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-black text-blue-700">Universal Broadcast</span>
+                                        <span className="text-[10px] font-bold text-blue-600/70 uppercase">Reaches All Registered Clients</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-4 relative">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Select Specific Clients</label>
+
+                                {selectedRecipients.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 p-2 bg-slate-50 border border-slate-100 rounded-2xl min-h-[50px]">
+                                        {selectedRecipients.map((recipient) => (
+                                            <div key={recipient.uid} className="flex items-center gap-2 bg-blue-600 text-white pl-1 pr-2 py-1 rounded-xl shadow-sm animate-in zoom-in-95 duration-200">
+                                                <div className="w-6 h-6 rounded-lg bg-blue-500 flex items-center justify-center text-[10px] font-black overflow-hidden">
+                                                    {(recipient.profileImage || recipient.photoURL) ? (
+                                                        <img src={recipient.profileImage || recipient.photoURL} alt="" className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        (recipient.displayName || recipient.name || recipient.email).charAt(0)
+                                                    )}
+                                                </div>
+                                                <span className="text-xs font-bold truncate max-w-[100px]">{recipient.displayName || recipient.name || recipient.email}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedRecipients(prev => prev.filter(r => r.uid !== recipient.uid))}
+                                                    className="hover:text-red-200 transition-colors"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <div className="relative">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={(e) => { setSearchQuery(e.target.value); setIsSearching(true); }}
+                                        onFocus={() => setIsSearching(true)}
+                                        placeholder={selectedRecipients.length > 0 ? "Add more clients..." : "Find client by name or email..."}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-slate-700 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+                                    />
+                                </div>
+
+                                {isSearching && searchQuery && (
+                                    <div className="absolute z-20 w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-2xl max-h-[250px] overflow-y-auto p-1 divide-y divide-slate-50">
+                                        {filteredUsers.filter(u => !selectedRecipients.find(r => r.uid === u.uid)).map((u) => (
+                                            <button
+                                                key={u.uid}
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelectedRecipients(prev => [...prev, u]);
+                                                    setSearchQuery("");
+                                                    setIsSearching(false);
+                                                }}
+                                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-left transition-colors first:rounded-t-xl last:rounded-b-xl"
+                                            >
+                                                <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 text-xs font-black shrink-0 overflow-hidden border border-slate-200">
+                                                    {(u.profileImage || u.photoURL) ? (
+                                                        <img src={u.profileImage || u.photoURL} alt="" className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        (u.displayName || u.name || u.email).charAt(0)
+                                                    )}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-black text-slate-800 truncate">{u.displayName || u.name || 'No Name'}</p>
+                                                    <p className="text-[10px] text-slate-400 font-bold truncate">{u.email}</p>
+                                                </div>
+                                            </button>
+                                        ))}
+                                        {filteredUsers.filter(u => !selectedRecipients.find(r => r.uid === u.uid)).length === 0 && (
+                                            <div className="p-4 text-center text-slate-400 text-xs font-bold italic">No matching clients found</div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Message Content</label>
+                        <textarea
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            placeholder="Type your message here..."
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-6 min-h-[120px] focus:ring-2 focus:ring-blue-500 outline-none resize-none text-slate-700 font-medium text-sm"
+                        />
+                    </div>
+
+                    <div className="flex justify-end">
                         <button
                             type="submit"
-                            disabled={loading || !newMessage.trim()}
-                            className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 disabled:opacity-50 transition-all shadow-lg shadow-blue-200 active:scale-95"
+                            disabled={loading || !newMessage.trim() || (targetType === "Client" && selectedRecipients.length === 0)}
+                            className="flex items-center gap-2 bg-blue-600 text-white px-8 py-3.5 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-700 disabled:opacity-50 transition-all shadow-xl shadow-blue-500/20 active:scale-[0.98]"
                         >
-                            {loading ? "Posting..." : "Post Update"}
+                            {loading ? <RefreshCw className="animate-spin" size={18} /> : <>Send Notification <Send size={16} /></>}
                         </button>
                     </div>
                 </form>
             </div>
 
-            <div className="space-y-4">
-                {messages.length > 0 ? (
-                    messages.map((msg) => (
-                        <div key={msg.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            <div className="flex-shrink-0">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md overflow-hidden ${msg.senderRole === 'admin' || msg.senderRole === 'Admin' ? 'bg-purple-600' : 'bg-indigo-600'}`}>
-                                    {(() => {
-                                        const matchingUser = allUsers.find(u => u.email === msg.senderEmail);
-                                        const pic = matchingUser?.profileImage || matchingUser?.photoURL;
-                                        return pic ? (
-                                            <img src={pic} alt={msg.senderName} className="w-full h-full object-cover" />
-                                        ) : (
-                                            msg.senderName?.charAt(0).toUpperCase()
-                                        );
-                                    })()}
+            <div className="space-y-6">
+                <h3 className="hidden md:flex text-xl font-bold text-slate-800 items-center gap-2">Recent Activity <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full">{notifications.length} History</span></h3>
+                <div className="space-y-4">
+                    {notifications.length > 0 ? (
+                        notifications.map((notif) => (
+                            <div key={notif.id} className="bg-white p-4 md:p-6 rounded-3xl shadow-sm border border-slate-100 group hover:shadow-md transition-all relative overflow-hidden flex flex-col gap-5">
+                                {/* Header Group */}
+                                <div className="flex items-center justify-between gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex-shrink-0">
+                                            <div className="w-10 h-10 rounded-full bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center overflow-hidden">
+                                                {notif.senderPhoto ? (
+                                                    <img src={notif.senderPhoto} alt="" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center text-white text-sm font-black italic">
+                                                        {(notif.senderName || 'A').charAt(0)}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-black text-slate-800">{notif.senderName || "Admin"}</span>
+                                                <span className="px-2 py-0.5 bg-[#E9D5FF] text-[#6D28D9] rounded-full text-[9px] font-black uppercase tracking-widest leading-none">
+                                                    ADMIN
+                                                </span>
+                                            </div>
+                                            <span className="text-slate-300 hidden sm:block">|</span>
+                                            <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
+                                                To: <span className="text-blue-600 font-black underline decoration-blue-100">{notif.receiverName}</span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="hidden sm:block text-xs font-black text-slate-900 uppercase tracking-widest tabular-nums font-mono">
+                                            {notif.timestamp?.toDate ? notif.timestamp.toDate().toLocaleString('en-US', {
+                                                month: 'short',
+                                                day: 'numeric',
+                                                year: 'numeric',
+                                                hour: 'numeric',
+                                                minute: 'numeric',
+                                                hour12: true
+                                            }) : 'Just Now'}
+                                        </div>
+                                        <button
+                                            onClick={() => handleDeleteNotification(notif.id)}
+                                            className="p-2 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Message Area: Full Width */}
+                                <div className="space-y-2">
+                                    {notif.message.split('\n').map((line: string, idx: number) => line.trim() && (
+                                        <p
+                                            key={idx}
+                                            className={cn(
+                                                "text-sm leading-relaxed whitespace-pre-wrap",
+                                                idx === 0
+                                                    ? "font-black text-slate-800 border-b border-slate-100/50 pb-2 mb-3 text-base"
+                                                    : "text-slate-600 font-medium"
+                                            )}
+                                        >
+                                            {line}
+                                        </p>
+                                    ))}
+                                </div>
+
+                                <div className="flex items-center gap-2 pt-2 border-t border-slate-50/50">
+                                    <span className={`w-2 h-2 rounded-full ${notif.isRead ? 'bg-green-500' : 'bg-blue-500 animate-pulse'}`}></span>
+                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                        {notif.isRead ? 'Viewed by Recipient' : 'Delivered to Dashboard'}
+                                    </span>
                                 </div>
                             </div>
-                            <div className="flex-1 space-y-1.5">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="font-bold text-slate-800">{msg.senderName}</span>
-                                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide whitespace-nowrap ${msg.senderRole === 'admin' || msg.senderRole === 'Admin' ? 'bg-purple-50 text-purple-700' : 'bg-indigo-50 text-indigo-700'}`}>
-                                            {msg.senderRole}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider whitespace-nowrap">
-                                            {msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleString() : 'Just now'}
-                                        </span>
-                                        {(user.role === "admin" || user.role === "Admin") && (
-                                            <button
-                                                onClick={() => handleDeleteMessage(msg.id)}
-                                                className="p-1 text-slate-400 hover:text-red-500 transition-colors"
-                                                title="Delete Message"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                                <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap font-medium">{msg.content}</p>
-                            </div>
+                        ))
+                    ) : (
+                        <div className="bg-white p-12 rounded-3xl border border-dashed border-slate-200 text-center">
+                            <Bell className="mx-auto text-slate-100 mb-4" size={48} />
+                            <p className="text-slate-400 font-bold text-lg">No notifications sent yet.</p>
                         </div>
-                    ))
-                ) : (
-                    <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-200 text-center">
-                        <Bell className="mx-auto text-slate-200 mb-3" size={40} />
-                        <p className="text-slate-400 font-bold">No updates yet.</p>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
         </div>
     );
@@ -2178,8 +2405,16 @@ export default function AdminDashboard() {
 
     // Persist active section on refresh
     useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const sectionParam = params.get("section");
         const savedSection = localStorage.getItem("adminActiveSection");
-        setActiveSection(savedSection || "overview");
+
+        if (sectionParam) {
+            setActiveSection(sectionParam);
+            localStorage.setItem("adminActiveSection", sectionParam);
+        } else {
+            setActiveSection(savedSection || "overview");
+        }
     }, []);
 
     useEffect(() => {
@@ -2214,14 +2449,27 @@ export default function AdminDashboard() {
 
                 try {
                     const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-                    const userData = userDoc.data();
+                    const userData = userDoc.data() || {};
+
+                    // Also check admin collection for profile pixel if role is admin
+                    let adminData = {};
+                    if (userData.role === "admin") {
+                        try {
+                            const adminDoc = await getDoc(doc(db, "admin", currentUser.uid));
+                            if (adminDoc.exists()) {
+                                adminData = adminDoc.data();
+                            }
+                        } catch (e) {
+                            console.error("Error fetching supplemental admin data:", e);
+                        }
+                    }
 
                     if (userData?.role === "Team_Member") {
                         router.push("/dashboard/team");
                     } else if (userData?.role !== "admin") {
                         router.push("/dashboard/client");
                     } else {
-                        setUser({ ...currentUser, ...userData });
+                        setUser({ ...currentUser, ...userData, ...adminData });
                     }
                 } catch (error) {
                     console.error("Error fetching admin profile:", error);
@@ -2397,7 +2645,7 @@ export default function AdminDashboard() {
 
     const menuItems = [
         { id: "overview", label: "Dashboard", icon: LayoutDashboard },
-        { id: "team-updates", label: "Team Updates", icon: Bell },
+        { id: "notifications", label: "Notifications", icon: Bell },
         { id: "projects", label: "Projects Tracker", icon: Briefcase },
         { id: "active-ids", label: "Active Client Projects", icon: Package },
         ...(user?.role === 'Team_Member' ? [] : [{ id: "users", label: "Users", icon: Users }]),
@@ -2513,7 +2761,7 @@ export default function AdminDashboard() {
             );
             case "projects": return <AdminProjects sheetUrl={sheetUrl} onUpdateUrl={handleUpdateSheetUrl} isSuperAdmin={isSuperAdmin} />;
             case "active-ids": return <AssignedProjectsSection projects={assignedProjects} users={allUsers} onDelete={handleDeleteProjectID} isSuperAdmin={isSuperAdmin} />;
-            case "team-updates": return <TeamMessagesSection user={user} allUsers={allUsers} />;
+            case "notifications": return <AdminNotificationsSection user={user} allUsers={allUsers} />;
             case "users":
                 if (user?.role === 'Team_Member') return <div className="p-8 text-center text-red-500 font-bold">Access Denied: Admin Only</div>;
                 return <UsersSection users={allUsers} totalUsers={totalUsers} onDelete={handleDeleteUser} currentUserEmail={user?.email} />;

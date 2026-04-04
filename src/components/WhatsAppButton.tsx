@@ -14,7 +14,7 @@ export default function WhatsAppButton() {
     }
 
     return (
-        <div className="fixed bottom-24 left-8 md:bottom-16 md:left-9 z-50 flex items-center justify-center group">
+        <div className="fixed bottom-24 left-8 md:bottom-16 md:left-9 z-30 flex items-center justify-center group transition-all duration-500 [.menu-open_&]:opacity-0 [.menu-open_&]:scale-50 [.menu-open_&]:pointer-events-none">
             {/* Pulsing Ring Animation */}
             <div className="absolute inset-0 rounded-full bg-green-500 animate-pulse-ring"></div>
 

@@ -33,7 +33,7 @@ export default function ScrollToTop() {
             suppressHydrationWarning={true}
             onClick={scrollToTop}
             className={cn(
-                "fixed bottom-40 right-9 md:bottom-28 md:right-9 z-50 w-12 h-12 flex items-center justify-center rounded-full bg-blue-600 text-white shadow-xl transition-all duration-300 hover:bg-blue-700 hover:-translate-y-1 focus:outline-none",
+                "fixed bottom-40 right-9 md:bottom-28 md:right-9 z-30 w-12 h-12 flex items-center justify-center rounded-full bg-blue-600 text-white shadow-xl transition-all duration-500 hover:bg-blue-700 hover:-translate-y-1 focus:outline-none [.menu-open_&]:opacity-0 [.menu-open_&]:scale-50 [.menu-open_&]:pointer-events-none",
                 isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10 pointer-events-none"
             )}
             aria-label="Scroll to top"

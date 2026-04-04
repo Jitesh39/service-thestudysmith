@@ -180,7 +180,7 @@ export default function ChatBot() {
     return (
         <>
             {/* Toggle Button Wrapper */}
-            <div className={cn("fixed bottom-24 right-9 md:bottom-12 md:right-9 z-50 flex items-center justify-center group", isOpen && "pointer-events-none")}>
+            <div className={cn("fixed bottom-24 right-9 md:bottom-12 md:right-9 z-30 flex items-center justify-center group transition-all duration-500 [.menu-open_&]:opacity-0 [.menu-open_&]:scale-50 [.menu-open_&]:pointer-events-none", isOpen && "pointer-events-none")}>
                 <button
                     suppressHydrationWarning={true}
                     onClick={() => setIsOpen(!isOpen)}
@@ -209,7 +209,7 @@ export default function ChatBot() {
             {/* Chat Window */}
             <div
                 className={cn(
-                    "fixed bottom-32 right-8 z-50 w-[400px] max-w-[calc(100vw-5rem)] bg-white rounded-2xl shadow-2xl border border-slate-100 flex flex-col transition-all duration-300 origin-bottom-right overflow-hidden",
+                    "fixed bottom-32 right-8 z-30 w-[400px] max-w-[calc(100vw-5rem)] bg-white rounded-2xl shadow-2xl border border-slate-100 flex flex-col transition-all duration-500 origin-bottom-right overflow-hidden [.menu-open_&]:opacity-0 [.menu-open_&]:scale-50 [.menu-open_&]:pointer-events-none",
                     isOpen
                         ? "scale-100 opacity-100 translate-y-0"
                         : "scale-90 opacity-0 translate-y-10 pointer-events-none"
