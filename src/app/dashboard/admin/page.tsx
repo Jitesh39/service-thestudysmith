@@ -2158,7 +2158,8 @@ const AdminNotificationsSection = ({ user, allUsers = [] }: { user: any, allUser
         }
 
         let finalClickAction = clickAction.trim();
-        if (finalClickAction && !finalClickAction.startsWith("http")) {
+        if (finalClickAction && !finalClickAction.startsWith("http") && !finalClickAction.startsWith("/")) {
+            // If it looks like a domain (e.g. google.com), add https
             finalClickAction = "https://" + finalClickAction;
         }
 

@@ -3,9 +3,6 @@ importScripts('https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js'
 importScripts('https://www.gstatic.com/firebasejs/10.0.0/firebase-messaging-compat.js');
 
 // These values are required for FCM service worker. 
-// They should ideally match your firebaseConfig in src/lib/firebase.ts
-// These values are required for FCM service worker. 
-// They now match your firebaseConfig from .env.local
 const firebaseConfig = {
   apiKey: "AIzaSyDiu47OFOeQTYcQCH6szMumBH4VnKANztQ",
   authDomain: "service-thestudysmith.firebaseapp.com",
@@ -21,20 +18,19 @@ firebase.initializeApp(firebaseConfig);
 // Retrieve an instance of Firebase Messaging so that it can handle background messages.
 const messaging = firebase.messaging();
 
-// If you want to handle background notifications (not just show them)
+// Handle background notifications
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
 
-  // Use optional chaining and fallbacks to prevent the worker from crashing
   const notificationTitle = payload.notification?.title || payload.data?.title || "Update from TheStudySmith";
   const notificationOptions = {
     body: payload.notification?.body || payload.data?.body || "Check your dashboard for new updates.",
-    icon: '/logo1.png', // Corrected path based on project icons
+    icon: '/logo1.png',
     badge: '/logo1.png',
-    tag: 'thestudysmith-important', // Helps merge notifications
-    requireInteraction: true, // Keeps notification visible until clicked
+    tag: 'thestudysmith-important',
+    requireInteraction: true,
     data: {
-      url: payload.data?.click_action || payload.notification?.click_action || '/dashboard'
+      url: payload.data?.click_action || payload.notification?.click_action || '/login'
     }
   };
 
@@ -44,20 +40,23 @@ messaging.onBackgroundMessage((payload) => {
 // Handle notification click - Redirect to the specified URL
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || '/dashboard';
+  
+  const targetUrl = event.notification.data?.url || '/login';
+  const absoluteTargetUrl = targetUrl.startsWith('http') ? targetUrl : new URL(targetUrl, self.location.origin).href;
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // If a window is already open, focus it and navigate
-      for (var i = 0; i < windowClients.length; i++) {
-        var client = windowClients[i];
-        if (client.url === targetUrl && 'focus' in client) {
+      // 1. Try to find an existing window with this EXACT absolute URL
+      for (let i = 0; i < windowClients.length; i++) {
+        const client = windowClients[i];
+        if (client.url === absoluteTargetUrl && 'focus' in client) {
           return client.focus();
         }
       }
-      // If no window is open, open a new one
+
+      // 2. Fallback: If no exact window is found, open a new one
       if (clients.openWindow) {
-        return clients.openWindow(targetUrl);
+        return clients.openWindow(absoluteTargetUrl);
       }
     })
   );

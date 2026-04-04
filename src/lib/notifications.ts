@@ -64,7 +64,7 @@ export const onForegroundMessage = () => {
       const notificationTitle = payload.notification?.title || "Notification from TheStudySmith";
       const notificationOptions = {
         body: payload.notification?.body || "Check your dashboard for updates.",
-        icon: '/logo1.png', // Correct relative path from public folder
+        icon: '/logo1.png', // Using the 18KB version for performance
         badge: '/logo1.png'
       };
 
