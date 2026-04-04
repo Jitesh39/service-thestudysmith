@@ -2242,8 +2242,10 @@ export default function AdminDashboard() {
         try {
             // 1. Fetch Settings
             const settingsDoc = await getDoc(doc(db, "settings", "dashboard"));
+            let currentSheetUrl = sheetUrl;
             if (settingsDoc.exists()) {
-                setSheetUrl(settingsDoc.data().sheetUrl || "");
+                currentSheetUrl = settingsDoc.data().sheetUrl || "";
+                setSheetUrl(currentSheetUrl);
             }
 
             // 2. Fetch Team Members
@@ -2264,19 +2266,101 @@ export default function AdminDashboard() {
 
             // 4. Fetch All Active Projects (Heavy Operation - converted to getDocs)
             const projectsSnapshot = await getDocs(collectionGroup(db, "assignedProjects")); // Can limit this if needed, but admin likely needs full view
-            const projectsList = projectsSnapshot.docs.map(doc => ({
+            let projectsList: any[] = projectsSnapshot.docs.map(doc => ({
                 ...doc.data(),
                 docId: doc.id,
                 uid: doc.ref.path.split('/')[1]
             }));
+
+            // 5. Fetch and Sync from Google Sheet
+            if (currentSheetUrl) {
+                try {
+                    const csvUrl = currentSheetUrl.replace('/pubhtml', '/pub') + (currentSheetUrl.includes('?') ? '&' : '?') + 'output=csv';
+                    const response = await fetch(csvUrl);
+                    if (response.ok) {
+                        const csvText = await response.text();
+                        const rows = csvText.split(/\r?\n/).filter(row => row.trim());
+                        if (rows.length >= 2) {
+                            const splitRow = (row: string) => {
+                                const result = [];
+                                let current = '';
+                                let inQuotes = false;
+                                for (let i = 0; i < row.length; i++) {
+                                    if (row[i] === '"') inQuotes = !inQuotes;
+                                    else if (row[i] === ',' && !inQuotes) {
+                                        result.push(current.trim());
+                                        current = '';
+                                    } else {
+                                        current += row[i];
+                                    }
+                                }
+                                result.push(current.trim());
+                                return result;
+                            };
+
+                            const headers = splitRow(rows[0]).map(h => h.toLowerCase().trim());
+                            const statusIndex = headers.findIndex(h => ['payment status', 'status', 'paymentstatus', 'pay status'].includes(h));
+                            const idIndex = headers.findIndex(h => ['project id', 'id', 'projectid'].includes(h));
+                            const enquiredIndex = headers.findIndex(h => ['enquired date', 'enquired', 'enquire date', 'date'].includes(h));
+                            const targetIndex = headers.findIndex(h => ['target date', 'target'].includes(h));
+                            const nameIndex = headers.findIndex(h => ['project name', 'project', 'title'].includes(h));
+                            const paymentIndex = headers.findIndex(h => ['payment', 'amount', 'price', 'total payment', 'fees', 'paid amount'].includes(h));
+
+                            let sheetPendingCount = 0;
+                            // Process Sheet Rows
+                            for (let i = 1; i < rows.length; i++) {
+                                const values = splitRow(rows[i]);
+                                if (statusIndex !== -1 && values[statusIndex]?.toLowerCase() === 'pending') {
+                                    sheetPendingCount++;
+                                }
+
+                                if (idIndex !== -1) {
+                                    const sheetPid = values[idIndex]?.trim();
+                                    if (!sheetPid) continue;
+
+                                    const matchedProjIndex = projectsList.findIndex(p => p.projectId === sheetPid);
+                                    if (matchedProjIndex !== -1) {
+                                        const matchedProj = projectsList[matchedProjIndex] as any;
+                                        const updates: any = {};
+
+                                        const sheetEnquired = enquiredIndex !== -1 ? values[enquiredIndex]?.trim() : null;
+                                        const sheetTarget = targetIndex !== -1 ? values[targetIndex]?.trim() : null;
+                                        const sheetStatus = statusIndex !== -1 ? values[statusIndex]?.trim() : null;
+                                        const sheetName = nameIndex !== -1 ? values[nameIndex]?.trim() : null;
+                                        const sheetPayment = paymentIndex !== -1 ? values[paymentIndex]?.trim() : null;
+
+                                        if (sheetEnquired && matchedProj.enquireDate !== sheetEnquired) updates.enquireDate = sheetEnquired;
+                                        if (sheetTarget && matchedProj.targetDate !== sheetTarget) updates.targetDate = sheetTarget;
+                                        if (sheetStatus && matchedProj.paymentStatus !== sheetStatus) updates.paymentStatus = sheetStatus;
+                                        if (sheetName && matchedProj.projectName !== sheetName) updates.projectName = sheetName;
+                                        if (sheetPayment && matchedProj.payment !== sheetPayment) updates.payment = sheetPayment;
+
+                                        if (Object.keys(updates).length > 0) {
+                                            // Update local list for immediate reflection
+                                            projectsList[matchedProjIndex] = { ...matchedProj, ...updates };
+                                            // Sync to Firestore in background (no await here to keep UI fast, or await if you want literal consistency)
+                                            const projRef = doc(db, "users", matchedProj.uid, "assignedProjects", matchedProj.docId);
+                                            await setDoc(projRef, updates, { merge: true });
+                                        }
+                                    }
+                                }
+                            }
+                            setPendingPayments(sheetPendingCount);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Sheet Sync Error:", e);
+                }
+            }
+
             setAssignedProjects(projectsList);
             const activeProjectsCount = projectsList.filter((p: any) => {
-                const status = (p.projectStatus || p.status || "").toLowerCase();
+                const status = (p.projectStatus || p.status || p.paymentStatus || "").toLowerCase();
                 return status !== 'completed' && status !== 'complete';
             }).length;
             setActiveProjects(activeProjectsCount);
 
-            // 5. Fetch Users
+            // 6. Fetch Users
             const usersSnapshot = await getDocs(collection(db, "users"));
             const usersList = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id }));
 
@@ -2308,102 +2392,6 @@ export default function AdminDashboard() {
             refreshData();
         }
     }, [user]);
-
-    // Fetch pending payments from Google Sheet
-    useEffect(() => {
-        if (!sheetUrl) return;
-
-        const fetchPendingPayments = async () => {
-            try {
-                const csvUrl = sheetUrl.replace('/pubhtml', '/pub') + (sheetUrl.includes('?') ? '&' : '?') + 'output=csv';
-                const response = await fetch(csvUrl);
-                if (!response.ok) return;
-                const csvText = await response.text();
-
-                const rows = csvText.split(/\r?\n/).filter(row => row.trim());
-                if (rows.length < 2) return;
-
-                const splitRow = (row: string) => {
-                    const result = [];
-                    let current = '';
-                    let inQuotes = false;
-                    for (let i = 0; i < row.length; i++) {
-                        if (row[i] === '"') inQuotes = !inQuotes;
-                        else if (row[i] === ',' && !inQuotes) {
-                            result.push(current.trim());
-                            current = '';
-                        } else {
-                            current += row[i];
-                        }
-                    }
-                    result.push(current.trim());
-                    return result;
-                };
-
-                const headers = splitRow(rows[0]).map(h => h.toLowerCase().trim());
-                const statusIndex = headers.findIndex(h =>
-                    ['payment status', 'status', 'paymentstatus', 'pay status'].includes(h)
-                );
-                const idIndex = headers.findIndex(h =>
-                    ['project id', 'id', 'projectid'].includes(h)
-                );
-                const enquiredIndex = headers.findIndex(h =>
-                    ['enquired date', 'enquired', 'enquire date', 'date'].includes(h)
-                );
-                const targetIndex = headers.findIndex(h =>
-                    ['target date', 'target'].includes(h)
-                );
-                const nameIndex = headers.findIndex(h =>
-                    ['project name', 'project', 'title'].includes(h)
-                );
-
-                if (statusIndex === -1) {
-                    setPendingPayments(0);
-                } else {
-                    let count = 0;
-                    for (let i = 1; i < rows.length; i++) {
-                        const values = splitRow(rows[i]);
-                        if (values[statusIndex]?.toLowerCase() === 'pending') {
-                            count++;
-                        }
-                    }
-                    setPendingPayments(count);
-                }
-
-                // Sync project details with Firestore
-                if (idIndex !== -1 && assignedProjects.length > 0) {
-                    for (let i = 1; i < rows.length; i++) {
-                        const values = splitRow(rows[i]);
-                        const sheetPid = values[idIndex]?.trim();
-                        if (!sheetPid) continue;
-
-                        const matchedProj = assignedProjects.find(p => p.projectId === sheetPid);
-                        if (matchedProj) {
-                            const updates: any = {};
-                            const sheetEnquired = enquiredIndex !== -1 ? values[enquiredIndex]?.trim() : null;
-                            const sheetTarget = targetIndex !== -1 ? values[targetIndex]?.trim() : null;
-                            const sheetStatus = statusIndex !== -1 ? values[statusIndex]?.trim() : null;
-                            const sheetName = nameIndex !== -1 ? values[nameIndex]?.trim() : null;
-
-                            if (sheetEnquired && matchedProj.enquireDate !== sheetEnquired) updates.enquireDate = sheetEnquired;
-                            if (sheetTarget && matchedProj.targetDate !== sheetTarget) updates.targetDate = sheetTarget;
-                            if (sheetStatus && matchedProj.paymentStatus !== sheetStatus) updates.paymentStatus = sheetStatus;
-                            if (sheetName && matchedProj.projectName !== sheetName) updates.projectName = sheetName;
-
-                            if (Object.keys(updates).length > 0) {
-                                const projRef = doc(db, "users", matchedProj.uid, "assignedProjects", matchedProj.docId);
-                                await setDoc(projRef, updates, { merge: true });
-                            }
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error("Error fetching sheet data:", error);
-            }
-        };
-
-        fetchPendingPayments();
-    }, [sheetUrl, assignedProjects]);
 
     const isSuperAdmin = user?.email === "thestudysmithpu@gmail.com";
 
