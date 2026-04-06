@@ -79,9 +79,9 @@ const OverviewSection = ({ user, projects, tickets, loading }: { user: any; proj
     // Count 'open' support tickets
     const activeTicketsCount = tickets.filter(t => t.status === 'open').length;
 
-    // Payment Logic: count 'Pending' as 1, identify '50% Paid' as 'Half Paid'
-    const pendingPaymentsCount = projects.filter(p => p.paymentStatus?.toLowerCase() === 'pending').length;
-    const halfPaidCount = projects.filter(p => p.paymentStatus?.toLowerCase().includes('50%')).length;
+    // Payment Logic: count 'Pending' and 'Partial'
+    const pendingPaymentsCount = projects.filter(p => (p.paymentStatus || "").toLowerCase() === 'pending').length;
+    const partialPaymentsCount = projects.filter(p => (p.paymentStatus || "").toLowerCase() === 'partial').length;
 
     return (
         <div className="space-y-6">
@@ -105,11 +105,7 @@ const OverviewSection = ({ user, projects, tickets, loading }: { user: any; proj
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
                     <p className="text-slate-500 text-sm font-medium mb-1 uppercase tracking-wider">Pending Payments</p>
                     <p className="text-xl md:text-2xl font-bold text-yellow-600">
-                        {(() => {
-                            if (pendingPaymentsCount === 0 && halfPaidCount === 0) return "0";
-                            if (halfPaidCount > 0 && pendingPaymentsCount === 0 && projects.length === 1) return "Half Paid";
-                            return pendingPaymentsCount + halfPaidCount;
-                        })()}
+                        {pendingPaymentsCount + partialPaymentsCount}
                     </p>
                 </div>
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
@@ -151,31 +147,25 @@ const OverviewSection = ({ user, projects, tickets, loading }: { user: any; proj
         </div>
     );
 };
-// Payment Logic with Razorpay
-const handleRazorpayPayment = async (project: any, user: any, router: any, setLoading: (l: boolean) => void) => {
+const handleRazorpayPayment = async (project: any, user: any, router: any, amount: number, setLoading: (l: boolean) => void) => {
     setLoading(true);
     try {
-        // 1. Create order on backend
         const response = await fetch("/api/razorpay/order", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                amount: project.payment || 0,
+                amount: amount,
                 userId: user.uid,
-                courseId: project.projectId || project.id
+                projectId: project.projectId
             }),
         });
 
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Order creation failed");
 
-        // 2. Load script if not already loaded
         const loadScript = () => {
             return new Promise((resolve) => {
-                if ((window as any).Razorpay) {
-                    resolve(true);
-                    return;
-                }
+                if ((window as any).Razorpay) { resolve(true); return; }
                 const script = document.createElement("script");
                 script.src = "https://checkout.razorpay.com/v1/checkout.js";
                 script.onload = () => resolve(true);
@@ -185,12 +175,8 @@ const handleRazorpayPayment = async (project: any, user: any, router: any, setLo
         };
 
         const res = await loadScript();
-        if (!res) {
-            alert("Razorpay SDK failed to load. Are you online?");
-            return;
-        }
+        if (!res) { alert("Razorpay SDK failed to load."); return; }
 
-        // 3. Open Razorpay Checkout popup
         const options = {
             key: data.key,
             amount: data.amount,
@@ -208,7 +194,8 @@ const handleRazorpayPayment = async (project: any, user: any, router: any, setLo
                             razorpay_order_id: response.razorpay_order_id,
                             razorpay_signature: response.razorpay_signature,
                             userId: user.uid,
-                            courseId: project.projectId || project.id,
+                            projectId: project.projectId,
+                            amount: amount
                         }),
                     });
 
@@ -223,40 +210,40 @@ const handleRazorpayPayment = async (project: any, user: any, router: any, setLo
                     router.push("/failed");
                 }
             },
-            prefill: {
-                email: user.email,
-                name: user.displayName,
-            },
-            theme: {
-                color: "#2563EB",
-            },
-            modal: {
-                ondismiss: () => setLoading(false),
-            },
+            prefill: { email: user.email, name: user.displayName },
+            theme: { color: "#2563EB" },
+            modal: { ondismiss: () => setLoading(false) },
         };
 
         const rzp = new (window as any).Razorpay(options);
-
-        rzp.on("payment.failed", function (response: any) {
-            console.error("Payment failed:", response.error);
+        rzp.on("payment.failed", (response: any) => {
+            console.error("Payment failed", response.error);
             router.push("/failed");
         });
-
         rzp.open();
     } catch (error: any) {
         console.error("Payment error:", error);
-        alert(error.message || "Failed to initiate payment. Please try again.");
+        alert(error.message || "Failed to initiate payment.");
     } finally {
         setLoading(false);
     }
 };
 const PaymentsSection = ({ projects, user }: { projects: any[], user: any }) => {
     const [loadingPaymentId, setLoadingPaymentId] = useState<string | null>(null);
+    const [showModal, setShowModal] = useState(false);
+    const [selectedProject, setSelectedProject] = useState<any>(null);
     const router = useRouter();
 
     const handlePayNow = (project: any) => {
-        setLoadingPaymentId(project.projectId || project.id);
-        handleRazorpayPayment(project, user, router, (l) => {
+        setSelectedProject(project);
+        setShowModal(true);
+    };
+
+    const processPayment = (amount: number) => {
+        if (!selectedProject) return;
+        setShowModal(false);
+        setLoadingPaymentId(selectedProject.projectId);
+        handleRazorpayPayment(selectedProject, user, router, amount, (l) => {
             if (!l) setLoadingPaymentId(null);
         });
     };
@@ -266,9 +253,49 @@ const PaymentsSection = ({ projects, user }: { projects: any[], user: any }) => 
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
                 <div>
                     <h2 className="text-3xl font-extrabold text-slate-900">Project <span className="text-blue-600">Payments</span></h2>
-                    <p className="text-slate-500 mt-2 font-medium">Track your payment status, outstanding balances, and transaction remarks for all your active projects.</p>
+                    <p className="text-slate-500 mt-2 font-medium">Manage your project payments securely using Razorpay gateway.</p>
                 </div>
             </div>
+
+            {/* Payment Selection Modal */}
+            {showModal && selectedProject && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 overflow-hidden p-8 space-y-6">
+                        <div className="text-center space-y-2">
+                            <h3 className="text-2xl font-black text-slate-900">Choose Payment <br /><span className="text-blue-600">Mode</span></h3>
+                            <p className="text-slate-500 text-sm font-medium">{selectedProject.projectName}</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4">
+                            <button
+                                onClick={() => processPayment(selectedProject.totalAmount - (selectedProject.paidAmount || 0))}
+                                className="flex flex-col items-center justify-center p-6 border-2 border-slate-100 rounded-2xl hover:border-blue-600 hover:bg-blue-50/30 transition-all group"
+                            >
+                                <span className="text-slate-400 group-hover:text-blue-600 text-[10px] font-black uppercase tracking-widest mb-1">Full Amount</span>
+                                <span className="text-xl font-black text-slate-900 group-hover:text-blue-700">₹{selectedProject.totalAmount - (selectedProject.paidAmount || 0)}</span>
+                            </button>
+
+                            {/* Only show 50% option if no payment has been made yet */}
+                            {(!selectedProject.paidAmount || selectedProject.paidAmount === 0) && (
+                                <button
+                                    onClick={() => processPayment(selectedProject.totalAmount * 0.5)}
+                                    className="flex flex-col items-center justify-center p-6 border-2 border-slate-100 rounded-2xl hover:border-green-600 hover:bg-green-50/30 transition-all group"
+                                >
+                                    <span className="text-slate-400 group-hover:text-green-600 text-[10px] font-black uppercase tracking-widest mb-1">50% Advance</span>
+                                    <span className="text-xl font-black text-slate-900 group-hover:text-green-700">₹{selectedProject.totalAmount * 0.5}</span>
+                                </button>
+                            )}
+                        </div>
+
+                        <button
+                            onClick={() => setShowModal(false)}
+                            className="w-full text-center text-slate-400 font-bold text-xs uppercase tracking-widest hover:text-slate-900"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {projects.length > 0 ? (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -293,9 +320,9 @@ const PaymentsSection = ({ projects, user }: { projects: any[], user: any }) => 
                             </thead>
                             <tbody className="divide-y divide-slate-50">
                                 {projects.map((p, i) => {
-                                    const status = p.paymentStatus?.toLowerCase();
-                                    const isPaid = status === 'paid' || status === 'full paid';
-                                    const isHalf = status?.includes('50%');
+                                    const status = (p.paymentStatus || "").toLowerCase();
+                                    const isPaid = status === 'paid';
+                                    const isPartial = status === 'partial';
                                     const isPending = status === 'pending';
 
                                     return (
@@ -303,47 +330,38 @@ const PaymentsSection = ({ projects, user }: { projects: any[], user: any }) => 
                                             <td className="p-5 font-mono text-sm font-bold text-blue-600">{p.projectId || p.id}</td>
                                             <td className="p-5">
                                                 <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${isPaid ? 'bg-green-100 text-green-700' :
-                                                    isHalf ? 'bg-blue-100 text-blue-700' :
-                                                        'bg-yellow-100 text-yellow-700'
+                                                        isPartial ? 'bg-blue-100 text-blue-700' :
+                                                            'bg-yellow-100 text-yellow-700'
                                                     }`}>
-                                                    {isPaid ? 'Cleared' : isHalf ? 'Half Paid' : isPending ? 'Pending' : p.paymentStatus || 'Awaited'}
+                                                    {isPaid ? 'Paid' : isPartial ? 'Partial' : 'Pending'}
                                                 </span>
                                             </td>
                                             <td className="p-5 text-center">
                                                 {isPaid ? (
-                                                    <button
-                                                        disabled
-                                                        className="px-4 py-2 bg-transparent text-slate-300 text-[10px] font-black uppercase tracking-widest rounded-xl cursor-not-allowed"
-                                                    >
+                                                    <span className="px-4 py-2 text-green-600 text-[10px] font-black uppercase tracking-widest">
                                                         Cleared
-                                                    </button>
-                                                ) : (isPending || isHalf) ? (
+                                                    </span>
+                                                ) : (
                                                     <button
                                                         onClick={() => handlePayNow(p)}
-                                                        disabled={loadingPaymentId === (p.projectId || p.id)}
-                                                        className={`px-4 py-2 border text-[10px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 shadow-lg shadow-green-100 flex items-center gap-2 ${loadingPaymentId === (p.projectId || p.id)
+                                                        disabled={loadingPaymentId === p.projectId}
+                                                        className={`px-4 py-2 border text-[10px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 shadow-lg flex items-center gap-2 ${loadingPaymentId === p.projectId
                                                                 ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
-                                                                : "bg-green-600 border-green-600 text-white hover:bg-green-700"
+                                                                : "bg-blue-600 border-blue-600 text-white hover:bg-blue-700 shadow-blue-100"
                                                             }`}
                                                     >
-                                                        {loadingPaymentId === (p.projectId || p.id) ? (
-                                                            <>
-                                                                <Loader2 className="animate-spin" size={12} />
-                                                                Loading...
-                                                            </>
+                                                        {loadingPaymentId === p.projectId ? (
+                                                            <><Loader2 className="animate-spin" size={12} /> Loading...</>
                                                         ) : (
-                                                            "Pay Now"
+                                                            isPartial ? "Pay Remaining" : "Pay Now"
                                                         )}
                                                     </button>
-
-                                                ) : (
-                                                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic">N/A</span>
                                                 )}
                                             </td>
                                             <td className="p-5 text-sm font-medium text-slate-500 italic">
-                                                {isPaid ? 'No balance remaining.' :
-                                                    isHalf ? '50% payment received.' :
-                                                        isPending ? 'Initial payment is awaited.' : 'Contact support for details.'}
+                                                {isPaid ? 'Payment fully cleared.' :
+                                                    isPartial ? '50% payment received. Pending remainder.' :
+                                                        'Initial payment is awaited.'}
                                             </td>
                                         </tr>
                                     );
@@ -1362,22 +1380,29 @@ export default function ClientDashboard() {
         return () => unsubscribe();
     }, [router]);
 
-    // Fetch Projects (Real-time: Important for status updates)
     useEffect(() => {
-        if (!user?.uid) return;
+        if (!user?.email) return;
 
-        // Limit query if possible, currently fetching all assigned projects
-        const q = query(collection(db, "users", user.uid, "assignedProjects"));
+        const q = query(
+            collection(db, "projects"),
+            where("email", "==", user.email.toLowerCase())
+        );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const projectsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const projectsList = snapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() as any }))
+                .sort((a, b) => {
+                    const dateA = a.createdAt?.seconds || 0;
+                    const dateB = b.createdAt?.seconds || 0;
+                    return dateB - dateA;
+                });
             setProjects(projectsList);
         }, (error) => {
             console.error("Projects Real-time Error:", error);
         });
 
         return () => unsubscribe();
-    }, [user?.uid]);
+    }, [user?.email]);
 
     // Fetch Tickets (One-time Fetch: Reduces reads)
     // Users rarely need real-time updates for ticket lists unless actively chatting

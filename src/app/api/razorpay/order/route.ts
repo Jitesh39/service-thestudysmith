@@ -9,29 +9,36 @@ const razorpay = new Razorpay({
 
 export async function POST(req: Request) {
   try {
-    const { amount, userId, courseId, currency = "INR" } = await req.json();
+    const { amount, userId, projectId, currency = "INR" } = await req.json();
 
-    if (!amount || !userId || !courseId) {
+    if (!amount || !userId || !projectId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Razorpay receives amounts in paise (multiply by 100)
+    // Verify project exists
+    const projectSnap = await db.collection("projects").doc(projectId).get();
+    if (!projectSnap.exists) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    // Razorpay receives amounts in paise
     const options = {
-      amount: amount * 100,
+      amount: Math.round(amount * 100),
       currency,
-      receipt: `receipt_${Date.now()}`,
+      receipt: `project_${projectId}_${Date.now()}`,
     };
 
     const order = await razorpay.orders.create(options);
 
-    // Save pending payment record to Firestore
+    // Save pending payment record
     await db.collection("payments").doc(order.id).set({
       userId,
-      courseId,
+      projectId,
       orderId: order.id,
       amount,
       currency,
       status: "pending",
+      paidAt: null,
       createdAt: new Date(),
     });
 

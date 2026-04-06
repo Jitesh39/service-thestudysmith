@@ -19,7 +19,8 @@ import {
     collectionGroup,
     getCountFromServer,
     getDoc,
-    onSnapshot
+    onSnapshot,
+    runTransaction
 } from "firebase/firestore";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -856,176 +857,302 @@ const ProfileSection = ({ user, loading, teamMembers }: { user: any; loading: bo
     );
 };
 
-const AdminProjects = ({ sheetUrl, onUpdateUrl, isSuperAdmin }: { sheetUrl: string, onUpdateUrl: (url: string) => void, isSuperAdmin: boolean }) => {
-    const [tempUrl, setTempUrl] = useState(sheetUrl);
-    const [isEditing, setIsEditing] = useState(false);
-    const [refreshKey, setRefreshKey] = useState(Date.now());
-    const [isRefreshing, setIsRefreshing] = useState(false);
+const AdminProjectTracker = ({ teamMembers }: { teamMembers: any[] }) => {
+    const [projects, setProjects] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [isAdding, setIsAdding] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [newProject, setNewProject] = useState({
+        projectName: "",
+        email: "",
+        clientName: "",
+        totalAmount: 0,
+        projectStatus: "Pending",
+        contactStatus: "Not Contacted",
+        enquireDate: new Date().toISOString().split('T')[0],
+        targetDate: "N/A",
+        assignedTo: "Unassigned",
+        deploymentStatus: "Pending",
+        domain: "",
+        domainPlan: "",
+        url: "",
+        registrar: ""
+    });
 
-    const [lastSynced, setLastSynced] = useState<string | null>(null);
-
-    // Sync tempUrl with sheetUrl when it changes externally
     useEffect(() => {
-        setTempUrl(sheetUrl);
-    }, [sheetUrl]);
+        const q = query(collection(db, "projects"), orderBy("projectId", "asc"));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setProjects(list);
+            setLoading(false);
+        });
+        return () => unsubscribe();
+    }, []);
 
-    const handleRefresh = () => {
-        setIsRefreshing(true);
-        setRefreshKey(Date.now());
-        setLastSynced(new Date().toLocaleTimeString());
-        setTimeout(() => setIsRefreshing(false), 800);
-    };
-
-    // Construct the final URL with a cache-busting parameter, handling hashes correctly
-    const getFinalUrl = (url: string) => {
-        if (!url) return "";
+    const handleUpdateField = async (id: string, field: string, value: any) => {
         try {
-            // Split by hash to ensure query params come before the fragment
-            const [base, hash] = url.split("#");
-            const separator = base.includes("?") ? "&" : "?";
-            return `${base}${separator}nocache=${refreshKey}${hash ? "#" + hash : ""}`;
-        } catch (e) {
-            return url;
+            const docRef = doc(db, "projects", id);
+            await updateDoc(docRef, { [field]: value });
+        } catch (error) {
+            console.error("Update error:", error);
         }
     };
 
+    const handleAddProject = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            // Validation
+            if (newProject.url && !newProject.url.startsWith("https://")) {
+                alert("URL must include https:// (e.g. https://example.com)");
+                return;
+            }
+
+            // 1. Get the current highest ID from the collection to be absolutely sure
+            const q = query(collection(db, "projects"), orderBy("projectId", "desc"), limit(1));
+            const snap = await getDocs(q);
+            let highestExisting = 1000;
+            if (!snap.empty) {
+                highestExisting = Number(snap.docs[0].data().projectId) || 1000;
+            }
+
+            await runTransaction(db, async (transaction) => {
+                const counterRef = doc(db, "counters", "projectId");
+                const counterDoc = await transaction.get(counterRef);
+
+                let counterId = 1000;
+                if (counterDoc.exists()) {
+                    counterId = Number(counterDoc.data().current) || 1000;
+                }
+
+                // Use the maximum of queried ID and counter to prevent duplicates
+                const nextId = Math.max(highestExisting, counterId) + 1;
+                const projectDocId = nextId.toString();
+                const projectRef = doc(db, "projects", projectDocId);
+
+                // Double check if this doc accidentally exists
+                const existingDoc = await transaction.get(projectRef);
+                if (existingDoc.exists()) {
+                    throw new Error("Duplicate ID detected during transaction.");
+                }
+
+                transaction.set(projectRef, {
+                    ...newProject,
+                    projectId: nextId,
+                    paidAmount: 0,
+                    paymentStatus: "pending",
+                    createdAt: serverTimestamp(),
+                });
+
+                transaction.set(counterRef, { current: nextId }, { merge: true });
+            });
+
+            setIsAdding(false);
+            setNewProject({
+                projectName: "", email: "", clientName: "", totalAmount: 0,
+                projectStatus: "Pending", contactStatus: "Not Contacted", enquireDate: new Date().toISOString().split('T')[0],
+                targetDate: "N/A", assignedTo: "Unassigned", deploymentStatus: "Pending",
+                domain: "", domainPlan: "", url: "", registrar: ""
+            });
+        } catch (error: any) {
+            console.error("Add error:", error);
+            alert("Failed to add project: " + error.message);
+        }
+    };
+
+    const filteredProjects = projects.filter(p =>
+        String(p.projectId || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(p.projectName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(p.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(p.clientName || "").toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
     return (
-        <div className="space-y-4 md:space-y-6">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+        <div className="space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
                 <div>
-                    <h2 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight text-center lg:text-left">Project Tracker</h2>
-                    <p className="text-slate-500 text-sm font-medium text-center lg:text-left">Real-time collaboration via Google Sheets</p>
+                    <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900">Project <span className="text-blue-600">Tracker</span></h2>
+                    <p className="hidden md:block text-slate-500 mt-1 font-medium italic">Manage projects with real-time Firestore sync (Sheet Interface).</p>
                 </div>
-                <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
-                    {lastSynced && !isEditing && (
-                        <div className="flex flex-col items-center sm:items-end">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Last Sync</span>
-                            <span className="text-xs font-bold text-blue-600">{lastSynced}</span>
-                        </div>
-                    )}
-                    <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 w-full sm:w-auto">
-                        {sheetUrl && (
-                            <button
-                                onClick={handleRefresh}
-                                className={`px-4 py-2.5 mr-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-blue-600 hover:border-blue-200 shadow-sm transition-all active:scale-95 flex items-center gap-2 ${isRefreshing ? "bg-blue-50" : ""}`}
-                                title="Sync Sheet Now"
-                            >
-                                <RefreshCw size={16} className={isRefreshing ? "animate-spin" : ""} />
-                                <span className="text-xs sm:text-sm font-bold">Refresh Sheet</span>
-                            </button>
-                        )}
-                        {isSuperAdmin && (
-                            <button
-                                onClick={() => setIsEditing(!isEditing)}
-                                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 border ${isEditing
-                                    ? "bg-slate-100 border-slate-200 text-slate-700"
-                                    : "bg-white border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-600 shadow-sm"
-                                    }`}
-                            >
-                                <Settings size={16} className={isEditing ? "animate-spin-slow" : ""} />
-                                <span>{isEditing ? "Cancel" : "Config Sheet"}</span>
-                            </button>
-                        )}
-                        {/* <button className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2">
-                            <Briefcase size={16} />
-                            <span>Add Project</span>
-                        </button> */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+                    <div className="relative w-full sm:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        <input
+                            type="text"
+                            placeholder="Find Project..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
                     </div>
+                    <button
+                        onClick={() => setIsAdding(true)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-100 transition-all active:scale-95 flex items-center justify-center gap-2 w-full sm:w-auto"
+                    >
+                        <Plus size={18} /> Add Project
+                    </button>
                 </div>
             </div>
 
-            {isEditing && (
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 p-6 rounded-2xl animate-in fade-in slide-in-from-top-4 duration-300 shadow-sm">
-                    <div className="flex items-center gap-2 mb-3 text-blue-800">
-                        <Settings size={18} />
-                        <label className="text-sm font-bold uppercase tracking-wider">Spreadsheet Configuration</label>
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-3">
-                        <input
-                            type="text"
-                            value={tempUrl}
-                            onChange={(e) => setTempUrl(e.target.value)}
-                            placeholder="Paste Google Sheet 'Publish to web' URL here..."
-                            className="flex-1 bg-white border border-blue-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner"
-                        />
-                        <button
-                            onClick={() => {
-                                onUpdateUrl(tempUrl);
-                                setIsEditing(false);
-                            }}
-                            className="w-full sm:w-auto bg-blue-600 text-white px-8 py-3 rounded-xl text-sm font-bold hover:bg-blue-700 shadow-md shadow-blue-200 transition-all active:scale-95"
-                        >
-                            Save Changes
-                        </button>
-                    </div>
-                    <div className="mt-4 flex items-start gap-3 bg-white/50 p-3 rounded-lg border border-white/80">
-                        <div className="mt-0.5 text-blue-600 font-bold text-lg">i</div>
-                        <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                            To get your link: Open your Google Sheet → Go to <span className="font-bold">File</span> → <span className="font-bold">Share</span> → <span className="font-bold">Publish to web</span> → Select <span className="font-bold">Embed</span> and copy the URL within the <code className="bg-slate-100 px-1 rounded">src="..."</code> attribute.
-                            <br /><br />
-                            <span className="text-blue-700 font-bold">Important:</span> Your sheet MUST include columns for <span className="font-bold">"Project ID"</span> and <span className="font-bold">"Email Address"</span> for the client portal.
-                            <br />
-                            <span className="font-bold">Recommended Column Names:</span> Project ID, Email Address, Project Name, Enquire Date, Project Status, Payment, Payment Status.
-                        </p>
+            {isAdding && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden p-8 space-y-6">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-2xl font-black text-slate-900">New <span className="text-blue-600">Project</span></h3>
+                            <button onClick={() => setIsAdding(false)} className="text-slate-400 hover:text-slate-900"><X size={24} /></button>
+                        </div>
+                        <form onSubmit={handleAddProject} className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Project Name</label>
+                                <input required type="text" value={newProject.projectName} onChange={(e) => setNewProject({ ...newProject, projectName: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. Portfolio Website" />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Client Email</label>
+                                <input required type="email" value={newProject.email} onChange={(e) => setNewProject({ ...newProject, email: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="client@example.com" />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Client Name</label>
+                                <input required type="text" value={newProject.clientName} onChange={(e) => setNewProject({ ...newProject, clientName: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. John Doe" />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Total Amount (₹)</label>
+                                <input required type="number" value={newProject.totalAmount} onChange={(e) => setNewProject({ ...newProject, totalAmount: parseFloat(e.target.value) })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="00.00" />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Target Date</label>
+                                <input type="date" value={newProject.targetDate === "N/A" ? "" : newProject.targetDate} onChange={(e) => setNewProject({ ...newProject, targetDate: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Website URL</label>
+                                <input type="text" value={newProject.url} onChange={(e) => setNewProject({ ...newProject, url: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://example.com" />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Registrar</label>
+                                <input type="text" value={newProject.registrar} onChange={(e) => setNewProject({ ...newProject, registrar: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. Hostinger" />
+                            </div>
+                            <div className="col-span-2 pt-4">
+                                <button type="submit" className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-xl hover:bg-blue-700 active:scale-[0.98] transition-all">Create Project</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
 
-            <div className="bg-white rounded-2xl md:rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden h-[400px] sm:h-[500px] md:h-[600px] lg:h-[750px] relative group border-t-4 border-t-blue-500">
-                {sheetUrl ? (
-                    <div className="w-full h-full relative flex flex-col">
-                        {/* Mobile view helper */}
-                        <div className="lg:hidden bg-blue-50/50 border-b border-blue-100 px-4 py-2 flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1">
-                                <Eye size={12} /> Scroll inside sheet to view
-                            </span>
-                            <a
-                                href={sheetUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[10px] font-black text-blue-700 bg-blue-100 px-2 py-0.5 rounded uppercase flex items-center gap-1"
-                            >
-                                Full Screen <Eye size={10} />
-                            </a>
-                        </div>
-
-                        <div className="flex-1 overflow-x-auto relative">
-                            {isRefreshing && (
-                                <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center animate-in fade-in duration-300">
-                                    <div className="flex flex-col items-center gap-3">
-                                        <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
-                                        <p className="text-blue-600 font-bold text-sm">Syncing Data...</p>
-                                    </div>
-                                </div>
-                            )}
-                            <iframe
-                                key={refreshKey}
-                                src={getFinalUrl(sheetUrl)}
-                                className="w-full h-full border-0 min-w-[320px]"
-                                allowFullScreen
-                                loading="lazy"
-                                title="Active Projects Sheet"
-                            />
-                        </div>
-                    </div>
-                ) : (
-                    <div className="h-full flex flex-col items-center justify-center p-12 text-center bg-slate-50/30">
-                        <div className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-slate-100 animate-bounce-subtle">
-                            <Briefcase className="text-blue-500" size={40} />
-                        </div>
-                        <h3 className="text-2xl font-black text-slate-800 mb-3 tracking-tight">Streamline Your Workflow</h3>
-                        <p className="max-w-md text-slate-500 text-lg mb-8 font-medium">
-                            Connect your Google Sheet project tracker to see all active projects, deadlines, and milestones directly in your admin dashboard.
-                        </p>
-                        <button
-                            onClick={() => setIsEditing(true)}
-                            className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-xl active:scale-95 flex items-center gap-2"
-                        >
-                            Connect Project Sheet
-                            <Settings size={18} />
-                        </button>
-                    </div>
-                )}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[1800px]">
+                    <thead className="bg-slate-900 border-b border-slate-800">
+                        <tr className="whitespace-nowrap">
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-900 z-10 border-r border-slate-800 shadow-[2px_0_5px_rgba(0,0,0,0.1)]">Project ID</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Project Name</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Client Name</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Email</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Enquire Date</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Target Date</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Assigned To</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Total ₹</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Received ₹</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Pay Status</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Deployment</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Domain</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Domain Plan</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">URL</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Registrar</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {loading ? (
+                            <tr><td colSpan={15} className="p-20 text-center text-slate-400 font-bold">Loading Project Data...</td></tr>
+                        ) : filteredProjects.map(p => (
+                            <tr key={p.id} className="hover:bg-blue-50/30 transition-colors group whitespace-nowrap">
+                                <td className="p-3 font-mono text-[11px] font-bold text-blue-600 sticky left-0 bg-white group-hover:bg-blue-50/30 z-10 border-r border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">{p.projectId}</td>
+                                <td className="p-3">
+                                    <input className="bg-transparent focus:bg-white focus:ring-1 focus:ring-blue-400 outline-none p-1 rounded w-full text-xs font-medium" defaultValue={p.projectName} onBlur={(e) => handleUpdateField(p.id, "projectName", e.target.value)} />
+                                </td>
+                                <td className="p-3">
+                                    <input className="bg-transparent focus:bg-white focus:ring-1 focus:ring-blue-400 outline-none p-1 rounded w-full text-xs font-medium" defaultValue={p.clientName} onBlur={(e) => handleUpdateField(p.id, "clientName", e.target.value)} />
+                                </td>
+                                <td className="p-3 text-[11px] font-medium text-slate-500">
+                                    <input className="bg-transparent focus:bg-white focus:ring-1 focus:ring-blue-400 outline-none p-1 rounded w-full text-xs font-medium" defaultValue={p.email} onBlur={(e) => handleUpdateField(p.id, "email", e.target.value)} />
+                                </td>
+                                <td className="p-3">
+                                    <select className="bg-transparent outline-none text-xs font-bold" defaultValue={p.projectStatus} onChange={(e) => handleUpdateField(p.id, "projectStatus", e.target.value)}>
+                                        <option value="Pending">Pending</option>
+                                        <option value="In Progress">In Progress</option>
+                                        <option value="Completed">Completed</option>
+                                        <option value="On Hold">On Hold</option>
+                                    </select>
+                                </td>
+                                <td className="p-3">
+                                    <select className="bg-transparent outline-none text-xs font-bold" defaultValue={p.contactStatus} onChange={(e) => handleUpdateField(p.id, "contactStatus", e.target.value)}>
+                                        <option value="Not Contacted">Not Contacted</option>
+                                        <option value="In Discussion">In Discussion</option>
+                                        <option value="Contacted">Contacted</option>
+                                    </select>
+                                </td>
+                                <td className="p-3">
+                                    <input type="date" className="bg-transparent outline-none text-[11px] font-bold text-slate-500" defaultValue={p.enquireDate} onChange={(e) => handleUpdateField(p.id, "enquireDate", e.target.value)} />
+                                </td>
+                                <td className="p-3">
+                                    <input type="date" className="bg-transparent outline-none text-[11px] font-bold text-slate-500" defaultValue={p.targetDate === "N/A" ? "" : p.targetDate} onChange={(e) => handleUpdateField(p.id, "targetDate", e.target.value)} />
+                                </td>
+                                <td className="p-3">
+                                    <select className="bg-transparent outline-none text-xs font-bold" defaultValue={p.assignedTo} onChange={(e) => handleUpdateField(p.id, "assignedTo", e.target.value)}>
+                                        <option value="Unassigned">Unassigned</option>
+                                        {teamMembers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                                    </select>
+                                </td>
+                                <td className="p-3">
+                                    <input type="number" className="bg-transparent focus:bg-white focus:ring-1 focus:ring-blue-400 outline-none p-1 rounded w-24 text-xs font-bold" defaultValue={p.totalAmount} onBlur={(e) => handleUpdateField(p.id, "totalAmount", parseFloat(e.target.value) || 0)} />
+                                </td>
+                                <td className="p-3 text-xs font-black text-green-600">₹{p.paidAmount || 0}</td>
+                                <td className="p-3">
+                                    <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tight ${p.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' :
+                                        p.paymentStatus === 'partial' ? 'bg-blue-100 text-blue-700' :
+                                            'bg-yellow-100 text-yellow-700'
+                                        }`}>
+                                        {p.paymentStatus || 'pending'}
+                                    </span>
+                                </td>
+                                <td className="p-3">
+                                    <select className="bg-transparent outline-none text-xs font-bold" defaultValue={p.deploymentStatus} onChange={(e) => handleUpdateField(p.id, "deploymentStatus", e.target.value)}>
+                                        <option value="Pending">Pending</option>
+                                        <option value="Live">Live</option>
+                                        <option value="Staging">Staging</option>
+                                    </select>
+                                </td>
+                                <td className="p-3">
+                                    <input className="bg-transparent focus:bg-white focus:ring-1 focus:ring-blue-400 outline-none p-1 rounded w-full text-xs" defaultValue={p.domain} onBlur={(e) => handleUpdateField(p.id, "domain", e.target.value)} />
+                                </td>
+                                <td className="p-3">
+                                    <input className="bg-transparent focus:bg-white focus:ring-1 focus:ring-blue-400 outline-none p-1 rounded w-full text-xs" defaultValue={p.domainPlan} onBlur={(e) => handleUpdateField(p.id, "domainPlan", e.target.value)} />
+                                </td>
+                                <td className="p-3">
+                                    <input className="bg-transparent focus:bg-white focus:ring-1 focus:ring-blue-400 outline-none p-1 rounded w-full text-xs" defaultValue={p.url} onBlur={(e) => handleUpdateField(p.id, "url", e.target.value)} />
+                                </td>
+                                <td className="p-3">
+                                    <input className="bg-transparent focus:bg-white focus:ring-1 focus:ring-blue-400 outline-none p-1 rounded w-full text-xs" defaultValue={p.registrar} onBlur={(e) => handleUpdateField(p.id, "registrar", e.target.value)} />
+                                </td>
+                                <td className="p-3 text-center">
+                                    <button
+                                        onClick={async () => {
+                                            if (window.confirm(`Delete project ${p.projectId}?`)) {
+                                                try {
+                                                    await deleteDoc(doc(db, "projects", p.id));
+                                                } catch (e) { console.error(e); }
+                                            }
+                                        }}
+                                        className="text-slate-300 hover:text-red-500 transition-colors"
+                                        title="Delete Project"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
         </div>
     );
@@ -2601,7 +2728,7 @@ export default function AdminDashboard() {
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
     const [user, setUser] = useState<any>(null);
     const [sheetUrl, setSheetUrl] = useState("");
-    const [assignedProjects, setAssignedProjects] = useState<any[]>([]);
+    const [globalProjects, setGlobalProjects] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
@@ -2681,101 +2808,19 @@ export default function AdminDashboard() {
             const openTicketsSnap = await getCountFromServer(openTicketsQuery);
             setTotalTickets(openTicketsSnap.data().count);
 
-            // 4. Fetch All Active Projects (Heavy Operation - converted to getDocs)
-            const projectsSnapshot = await getDocs(collectionGroup(db, "assignedProjects")); // Can limit this if needed, but admin likely needs full view
-            let projectsList: any[] = projectsSnapshot.docs.map(doc => ({
-                ...doc.data(),
-                docId: doc.id,
-                uid: doc.ref.path.split('/')[1]
-            }));
+            // 4. Fetch Summary Stats and Global Projects
+            const projectsSnapshot = await getDocs(collection(db, "projects"));
+            const projectsList = projectsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
 
-            // 5. Fetch and Sync from Google Sheet
-            if (currentSheetUrl) {
-                try {
-                    const csvUrl = currentSheetUrl.replace('/pubhtml', '/pub') + (currentSheetUrl.includes('?') ? '&' : '?') + 'output=csv';
-                    const response = await fetch(csvUrl);
-                    if (response.ok) {
-                        const csvText = await response.text();
-                        const rows = csvText.split(/\r?\n/).filter(row => row.trim());
-                        if (rows.length >= 2) {
-                            const splitRow = (row: string) => {
-                                const result = [];
-                                let current = '';
-                                let inQuotes = false;
-                                for (let i = 0; i < row.length; i++) {
-                                    if (row[i] === '"') inQuotes = !inQuotes;
-                                    else if (row[i] === ',' && !inQuotes) {
-                                        result.push(current.trim());
-                                        current = '';
-                                    } else {
-                                        current += row[i];
-                                    }
-                                }
-                                result.push(current.trim());
-                                return result;
-                            };
+            const activeCount = projectsList.filter((p: any) => p.projectStatus !== "Completed").length;
+            const pendingCount = projectsList.filter((p: any) => p.paymentStatus === "pending" || p.paymentStatus === "partial").length;
 
-                            const headers = splitRow(rows[0]).map(h => h.toLowerCase().trim());
-                            const statusIndex = headers.findIndex(h => ['payment status', 'status', 'paymentstatus', 'pay status'].includes(h));
-                            const idIndex = headers.findIndex(h => ['project id', 'id', 'projectid'].includes(h));
-                            const enquiredIndex = headers.findIndex(h => ['enquired date', 'enquired', 'enquire date', 'date'].includes(h));
-                            const targetIndex = headers.findIndex(h => ['target date', 'target'].includes(h));
-                            const nameIndex = headers.findIndex(h => ['project name', 'project', 'title'].includes(h));
-                            const paymentIndex = headers.findIndex(h => ['payment', 'amount', 'price', 'total payment', 'fees', 'paid amount'].includes(h));
+            setActiveProjects(activeCount);
+            setPendingPayments(pendingCount);
+            setGlobalProjects(projectsList);
+            setLoading(false);
 
-                            let sheetPendingCount = 0;
-                            // Process Sheet Rows
-                            for (let i = 1; i < rows.length; i++) {
-                                const values = splitRow(rows[i]);
-                                if (statusIndex !== -1 && values[statusIndex]?.toLowerCase() === 'pending') {
-                                    sheetPendingCount++;
-                                }
-
-                                if (idIndex !== -1) {
-                                    const sheetPid = values[idIndex]?.trim();
-                                    if (!sheetPid) continue;
-
-                                    const matchedProjIndex = projectsList.findIndex(p => p.projectId === sheetPid);
-                                    if (matchedProjIndex !== -1) {
-                                        const matchedProj = projectsList[matchedProjIndex] as any;
-                                        const updates: any = {};
-
-                                        const sheetEnquired = enquiredIndex !== -1 ? values[enquiredIndex]?.trim() : null;
-                                        const sheetTarget = targetIndex !== -1 ? values[targetIndex]?.trim() : null;
-                                        const sheetStatus = statusIndex !== -1 ? values[statusIndex]?.trim() : null;
-                                        const sheetName = nameIndex !== -1 ? values[nameIndex]?.trim() : null;
-                                        const sheetPayment = paymentIndex !== -1 ? values[paymentIndex]?.trim() : null;
-
-                                        if (sheetEnquired && matchedProj.enquireDate !== sheetEnquired) updates.enquireDate = sheetEnquired;
-                                        if (sheetTarget && matchedProj.targetDate !== sheetTarget) updates.targetDate = sheetTarget;
-                                        if (sheetStatus && matchedProj.paymentStatus !== sheetStatus) updates.paymentStatus = sheetStatus;
-                                        if (sheetName && matchedProj.projectName !== sheetName) updates.projectName = sheetName;
-                                        if (sheetPayment && matchedProj.payment !== sheetPayment) updates.payment = sheetPayment;
-
-                                        if (Object.keys(updates).length > 0) {
-                                            // Update local list for immediate reflection
-                                            projectsList[matchedProjIndex] = { ...matchedProj, ...updates };
-                                            // Sync to Firestore in background (no await here to keep UI fast, or await if you want literal consistency)
-                                            const projRef = doc(db, "users", matchedProj.uid, "assignedProjects", matchedProj.docId);
-                                            await setDoc(projRef, updates, { merge: true });
-                                        }
-                                    }
-                                }
-                            }
-                            setPendingPayments(sheetPendingCount);
-                        }
-                    }
-                } catch (e) {
-                    console.error("Sheet Sync Error:", e);
-                }
-            }
-
-            setAssignedProjects(projectsList);
-            const activeProjectsCount = projectsList.filter((p: any) => {
-                const status = (p.projectStatus || p.status || p.paymentStatus || "").toLowerCase();
-                return status !== 'completed' && status !== 'complete';
-            }).length;
-            setActiveProjects(activeProjectsCount);
+            // 5. Old CSV Sync logic removed from here...
 
             // 6. Fetch Users
             const usersSnapshot = await getDocs(collection(db, "users"));
@@ -2882,17 +2927,18 @@ export default function AdminDashboard() {
         }
     };
 
-    const handleDeleteProjectID = async (uid: string, docId: string) => {
-        if (!uid || !docId) {
-            alert("Error: Missing identification data for this project assignment.");
+    const handleDeleteProjectID = async (id: string) => {
+        if (!id) {
+            alert("Error: Missing identification data for this project.");
             return;
         }
         try {
-            await deleteDoc(doc(db, "users", uid, "assignedProjects", docId));
-            alert("Project ID removed successfully from user!");
+            await deleteDoc(doc(db, "projects", id));
+            alert("Project removed successfully!");
+            refreshData();
         } catch (error) {
-            console.error("Error deleting project ID:", error);
-            alert("Failed to remove project ID.");
+            console.error("Error deleting project:", error);
+            alert("Failed to remove project.");
         }
     };
 
@@ -2928,17 +2974,17 @@ export default function AdminDashboard() {
                     onDeleteMember={handleDeleteTeamMember}
                 />
             );
-            case "projects": return <AdminProjects sheetUrl={sheetUrl} onUpdateUrl={handleUpdateSheetUrl} isSuperAdmin={isSuperAdmin} />;
-            case "active-ids": return <AssignedProjectsSection projects={assignedProjects} users={allUsers} onDelete={handleDeleteProjectID} isSuperAdmin={isSuperAdmin} />;
+            case "projects": return <AdminProjectTracker teamMembers={teamMembers} />;
+            case "active-ids": return <AssignedProjectsSection projects={globalProjects} users={allUsers} onDelete={handleDeleteProjectID} isSuperAdmin={isSuperAdmin} />;
             case "notifications": return <AdminNotificationsSection user={user} allUsers={allUsers} />;
             case "users":
                 if (user?.role === 'Team_Member') return <div className="p-8 text-center text-red-500 font-bold">Access Denied: Admin Only</div>;
                 return <UsersSection users={allUsers} totalUsers={totalUsers} onDelete={handleDeleteUser} currentUserEmail={user?.email} />;
-            case "payments": return <AdminPaymentsSection projects={assignedProjects} />;
+            case "payments": return <AdminPaymentsSection projects={globalProjects} />;
             case "support": return <AdminSupportSection />;
             case "blog-management": return <BlogManagementSection user={user} />;
             case "finance":
-                return <FinanceSection assignedProjects={assignedProjects} isSuperAdmin={isSuperAdmin} user={user} />;
+                return <FinanceSection assignedProjects={globalProjects} isSuperAdmin={isSuperAdmin} user={user} />;
             case "publish":
                 if (user?.role === 'Team_Member') return <div className="p-8 text-center text-red-500 font-bold">Access Denied: Admin Only</div>;
                 return <ProjectPublishSection />;

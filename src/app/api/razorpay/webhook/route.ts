@@ -32,29 +32,41 @@ export async function POST(req: Request) {
     if (body.event === "payment.captured") {
       const { order_id, id: payment_id } = body.payload.payment.entity;
 
-      // Use a transaction for consistent updates via webhook too
       await db.runTransaction(async (transaction) => {
         const paymentRef = db.collection("payments").doc(order_id);
         const paymentDoc = await transaction.get(paymentRef);
 
         if (paymentDoc.exists && paymentDoc.data()?.status !== "success") {
-          const { userId, courseId } = paymentDoc.data()!;
+          const { userId, projectId, amount } = paymentDoc.data()!;
 
-          // 1. Mark as success
-          transaction.update(paymentRef, {
-            paymentId: payment_id,
-            status: "success",
-            webhookCapturedAt: admin.firestore.FieldValue.serverTimestamp(),
-          });
+          const projectRef = db.collection("projects").doc(projectId);
+          const projectDoc = await transaction.get(projectRef);
 
-          // 2. Grant access
-          const accessRef = db.collection("userCourses").doc(`${userId}_${courseId}`);
-          transaction.set(accessRef, {
-            userId,
-            courseId,
-            purchased: true,
-            purchasedAt: admin.firestore.FieldValue.serverTimestamp(),
-          }, { merge: true });
+          if (projectDoc.exists) {
+            const pData = projectDoc.data()!;
+            const totalAmount = parseFloat(pData.totalAmount) || 0;
+            const currentPaid = parseFloat(pData.paidAmount) || 0;
+            const newPaidAmount = currentPaid + parseFloat(amount);
+
+            let newStatus = "partial";
+            if (newPaidAmount >= totalAmount) {
+              newStatus = "paid";
+            }
+
+            // Update Project
+            transaction.update(projectRef, {
+              paidAmount: newPaidAmount,
+              paymentStatus: newStatus,
+              lastWebhookAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            // Update Payment Record
+            transaction.update(paymentRef, {
+              paymentId: payment_id,
+              status: "success",
+              webhookCapturedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          }
         }
       });
     }
