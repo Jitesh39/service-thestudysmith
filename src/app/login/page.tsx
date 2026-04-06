@@ -49,7 +49,12 @@ export default function LoginPage() {
             localStorage.removeItem("clientActiveSection");
             localStorage.removeItem("adminActiveSection");
 
-            if (role === "admin") {
+            const params = new URLSearchParams(window.location.search);
+            const callbackUrl = params.get("callbackUrl");
+
+            if (callbackUrl) {
+                router.push(callbackUrl);
+            } else if (role === "admin") {
                 router.push("/dashboard/admin");
             } else if (role === "Team_Member") {
                 router.push("/dashboard/team");
@@ -110,7 +115,12 @@ export default function LoginPage() {
             localStorage.removeItem("clientActiveSection");
             localStorage.removeItem("adminActiveSection");
 
-            if (role === "admin") {
+            const params = new URLSearchParams(window.location.search);
+            const callbackUrl = params.get("callbackUrl");
+
+            if (callbackUrl) {
+                router.push(callbackUrl);
+            } else if (role === "admin") {
                 router.push("/dashboard/admin");
             } else if (role === "Team_Member") {
                 router.push("/dashboard/team");

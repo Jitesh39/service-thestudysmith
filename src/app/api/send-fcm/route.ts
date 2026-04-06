@@ -57,7 +57,7 @@ initializeFirebaseAdmin();
 
 export async function POST(req: NextRequest) {
   try {
-    const { token, title, body, clickAction } = await req.json();
+    const { token, title, body, clickAction, data = {} } = await req.json();
 
     if (!token || !title || !body) {
       return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 });
@@ -80,6 +80,7 @@ export async function POST(req: NextRequest) {
       },
       data: {
         click_action: clickAction || "/login",
+        ...data
       }
     };
 

@@ -27,21 +27,14 @@ const SuccessPage = () => {
 
         <h1 className="text-3xl font-bold text-slate-900 mb-3 tracking-tight">Payment Successful!</h1>
         <p className="text-slate-600 mb-8 leading-relaxed">
-          Your payment has been completed successfully. Please share a screenshot of your payment with our team for confirmation. Once verified, your project work will proceed accordingly. Thank you!
-        </p>
+          Payment successful. Your project will be processed shortly.</p>
 
         <div className="space-y-4">
           <Link
             href="/dashboard/client"
             className="block w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all shadow-[0_4px_14px_rgba(37,99,235,0.39)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.23)] active:scale-95"
           >
-            Go to Your Dashboard
-          </Link>
-          <Link
-            href="/"
-            className="block w-full px-6 py-3 text-slate-500 hover:text-slate-800 font-medium transition-colors"
-          >
-            Back to Home
+            Back to Dashboard
           </Link>
         </div>
       </motion.div>

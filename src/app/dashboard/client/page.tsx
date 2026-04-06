@@ -71,6 +71,17 @@ const formatDate = (dateString: string | undefined | null) => {
     });
 };
 
+const menuItems = [
+    { id: "overview", label: "Overview", icon: LayoutDashboard },
+    { id: "profile", label: "My Profile", icon: User },
+    { id: "projects", label: "My Projects", icon: Package },
+    { id: "payments", label: "Payments", icon: CreditCard },
+    { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "support", label: "Support", icon: MessageSquare },
+    { id: "quick-guide", label: "Quick Guide", icon: FileText },
+    { id: "documents", label: "Documents", icon: FileText },
+];
+
 // Placeholder Components for Sections
 const OverviewSection = ({ user, projects, tickets, loading }: { user: any; projects: any[]; tickets: any[]; loading: boolean }) => {
     // Count 'Pending' (Work-in-progress) as Active projects
@@ -147,21 +158,36 @@ const OverviewSection = ({ user, projects, tickets, loading }: { user: any; proj
         </div>
     );
 };
-const handleRazorpayPayment = async (project: any, user: any, router: any, amount: number, setLoading: (l: boolean) => void) => {
+const handleRazorpayPayment = async (project: any, user: any, router: any, amount: number, setLoading: (l: boolean) => void, paymentRequestId?: string) => {
+    if (!project && !paymentRequestId) return;
+    if (!amount || isNaN(amount) || amount <= 0) {
+        alert("Invalid payment amount.");
+        return;
+    }
     setLoading(true);
     try {
-        const response = await fetch("/api/razorpay/order", {
+        console.log(`[Payment Init] Project: ${project?.projectId || "N/A"}, Amount: ${amount}, Request: ${paymentRequestId || "N/A"}`);
+
+        if (!project?.projectId && !paymentRequestId) {
+            throw new Error("Project ID or Request ID is missing. Cannot proceed with payment.");
+        }
+        if (!amount || isNaN(amount) || amount <= 0) {
+            throw new Error("Invalid payment amount.");
+        }
+
+        const orderRes = await fetch("/api/razorpay/order", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 amount: amount,
                 userId: user.uid,
-                projectId: project.projectId
+                projectId: project?.projectId || null,
+                requestId: paymentRequestId || null
             }),
         });
 
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Order creation failed");
+        const data = await orderRes.json();
+        if (!orderRes.ok) throw new Error(data.error || "Order creation failed");
 
         const loadScript = () => {
             return new Promise((resolve) => {
@@ -182,7 +208,7 @@ const handleRazorpayPayment = async (project: any, user: any, router: any, amoun
             amount: data.amount,
             currency: data.currency,
             name: "The Study Smith",
-            description: `Payment for Project: ${project.projectName || project.projectId}`,
+            description: paymentRequestId ? `Payment for Invoice: ${paymentRequestId}` : `Payment for Project: ${project?.projectName || project?.projectId}`,
             order_id: data.orderId,
             handler: async function (response: any) {
                 try {
@@ -194,7 +220,8 @@ const handleRazorpayPayment = async (project: any, user: any, router: any, amoun
                             razorpay_order_id: response.razorpay_order_id,
                             razorpay_signature: response.razorpay_signature,
                             userId: user.uid,
-                            projectId: project.projectId,
+                            projectId: project?.projectId || null,
+                            requestId: paymentRequestId || null,
                             amount: amount
                         }),
                     });
@@ -228,11 +255,32 @@ const handleRazorpayPayment = async (project: any, user: any, router: any, amoun
         setLoading(false);
     }
 };
-const PaymentsSection = ({ projects, user }: { projects: any[], user: any }) => {
+const PaymentsSection = ({ projects, user, paymentRequests }: { projects: any[], user: any, paymentRequests: any[] }) => {
     const [loadingPaymentId, setLoadingPaymentId] = useState<string | null>(null);
     const [showModal, setShowModal] = useState(false);
     const [selectedProject, setSelectedProject] = useState<any>(null);
     const router = useRouter();
+
+    // Deep Linking: Scroll to specific request and highlight
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const requestId = params.get("requestId");
+        if (requestId && paymentRequests.length > 0) {
+            // Small delay to ensure DOM is fully rendered
+            const timer = setTimeout(() => {
+                const element = document.getElementById(`request-${requestId}`);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    element.classList.add('bg-blue-50/80', 'ring-2', 'ring-blue-500/20');
+                    // Remove highlight after 5 seconds
+                    setTimeout(() => {
+                        element.classList.remove('bg-blue-50/80', 'ring-2', 'ring-blue-500/20');
+                    }, 5000);
+                }
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [paymentRequests]);
 
     const handlePayNow = (project: any) => {
         setSelectedProject(project);
@@ -248,12 +296,179 @@ const PaymentsSection = ({ projects, user }: { projects: any[], user: any }) => 
         });
     };
 
+    const handleRequestPayment = (request: any) => {
+        setLoadingPaymentId(request.id);
+        handleRazorpayPayment(null, user, router, request.amount, (l) => {
+            if (!l) setLoadingPaymentId(null);
+        }, request.id);
+    };
+
     return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
+        <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-4">
                 <div>
-                    <h2 className="text-3xl font-extrabold text-slate-900">Project <span className="text-blue-600">Payments</span></h2>
-                    <p className="text-slate-500 mt-2 font-medium">Manage your project payments securely using Razorpay gateway.</p>
+                    <h2 className="text-3xl font-extrabold text-slate-900">Payments <span className="text-blue-600">& Billing</span></h2>
+                    <p className="text-slate-500 mt-2 font-medium">Manage your project balances and administrative payment requests.</p>
+                </div>
+            </div>
+
+            {/* Custom Payment Requests (ADMIN INVOICES) */}
+            <div className="space-y-6">
+                <div className="flex items-center gap-3 px-2">
+                    <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600">
+                        <FileText size={20} />
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-800">Payment Requests</h3>
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Sent by Administrative Team</p>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-50 border-b border-slate-100">
+                                <tr>
+                                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Purpose / Title</th>
+                                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Project ID</th>
+                                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
+                                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {paymentRequests.length > 0 ? (
+                                    paymentRequests.map((req) => (
+                                        <tr key={req.id} id={`request-${req.id}`} className="hover:bg-slate-50/50 transition-all duration-300">
+                                            <td className="p-5">
+                                                <p className="font-bold text-slate-800">{req.title}</p>
+                                                {req.description && <p className="text-xs text-slate-500 font-medium mt-1">{req.description}</p>}
+                                                <p className="text-[10px] text-slate-400 font-bold mt-1">Requested on {req.createdAt?.toDate().toLocaleDateString('en-GB')}</p>
+                                            </td>
+                                            <td className="p-5">
+                                                <span className="font-mono text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                                    {req.projectId || "General"}
+                                                </span>
+                                            </td>
+                                            <td className="p-5">
+                                                <span className="text-lg font-black text-slate-900">₹{req.amount}</span>
+                                            </td>
+                                            <td className="p-5">
+                                                <span className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${req.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-red-50 text-red-600 animate-pulse'}`}>
+                                                    {req.status}
+                                                </span>
+                                            </td>
+                                            <td className="p-5 text-center">
+                                                {req.status === 'paid' ? (
+                                                    <div className="flex items-center justify-center gap-2 text-green-600 font-black text-[10px] uppercase tracking-widest">
+                                                        <Check size={14} /> FULFILLED
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handleRequestPayment(req)}
+                                                        disabled={loadingPaymentId === req.id}
+                                                        className="px-6 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all disabled:opacity-50 shadow-lg"
+                                                    >
+                                                        {loadingPaymentId === req.id ? "Processing..." : "Pay Invoice"}
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={5} className="p-12 text-center text-slate-400 font-medium italic text-sm">No specific payment requests found from admin.</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {/* Project Balances */}
+            <div className="space-y-6">
+                <div className="flex items-center gap-3 px-2">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                        <Package size={20} />
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-800">Project Balances</h3>
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Direct Project Wise Payments</p>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-white">
+                        <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                            <CreditCard size={20} className="text-blue-600" />
+                            Recent Payment Status
+                        </h3>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1 rounded-full">
+                            {projects.length} Total Projects
+                        </span>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-50/50 border-b border-slate-50">
+                                <tr>
+                                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Project ID</th>
+                                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Payment Status</th>
+                                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Action</th>
+                                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Agreement Remark</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {projects.map((p, i) => {
+                                    const status = (p.paymentStatus || "").toLowerCase();
+                                    const isPaid = status === 'paid';
+                                    const isPartial = status === 'partial';
+                                    const isPending = status === 'pending';
+
+                                    return (
+                                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                                            <td className="p-5 font-mono text-sm font-bold text-blue-600">{p.projectId || p.id}</td>
+                                            <td className="p-5">
+                                                <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${isPaid ? 'bg-green-100 text-green-700' :
+                                                    isPartial ? 'bg-blue-100 text-blue-700' :
+                                                        'bg-yellow-100 text-yellow-700'
+                                                    }`}>
+                                                    {isPaid ? 'Paid' : isPartial ? 'Partial' : 'Pending'}
+                                                </span>
+                                            </td>
+                                            <td className="p-5 text-center">
+                                                {isPaid ? (
+                                                    <span className="px-4 py-2 text-green-600 text-[10px] font-black uppercase tracking-widest">
+                                                        Cleared
+                                                    </span>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handlePayNow(p)}
+                                                        disabled={loadingPaymentId === p.projectId}
+                                                        className={`px-4 py-2 border text-[10px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 shadow-lg flex items-center gap-2 ${loadingPaymentId === p.projectId
+                                                            ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
+                                                            : "bg-blue-600 border-blue-600 text-white hover:bg-blue-700 shadow-blue-100"
+                                                            }`}
+                                                    >
+                                                        {loadingPaymentId === p.projectId ? (
+                                                            <><Loader2 className="animate-spin" size={12} /> Loading...</>
+                                                        ) : (
+                                                            isPartial ? "Pay Remaining" : "Pay Now"
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </td>
+                                            <td className="p-5 text-sm font-medium text-slate-500 italic">
+                                                {isPaid ? 'Payment fully cleared.' :
+                                                    isPartial ? '50% payment received. Pending remainder.' :
+                                                        'Initial payment is awaited.'}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -297,91 +512,6 @@ const PaymentsSection = ({ projects, user }: { projects: any[], user: any }) => 
                 </div>
             )}
 
-            {projects.length > 0 ? (
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                    <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-white">
-                        <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
-                            <CreditCard size={20} className="text-blue-600" />
-                            Recent Payment Status
-                        </h3>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1 rounded-full">
-                            {projects.length} Total Projects
-                        </span>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-50/50 border-b border-slate-50">
-                                <tr>
-                                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Project ID</th>
-                                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Payment Status</th>
-                                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Action</th>
-                                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Agreement Remark</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {projects.map((p, i) => {
-                                    const status = (p.paymentStatus || "").toLowerCase();
-                                    const isPaid = status === 'paid';
-                                    const isPartial = status === 'partial';
-                                    const isPending = status === 'pending';
-
-                                    return (
-                                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="p-5 font-mono text-sm font-bold text-blue-600">{p.projectId || p.id}</td>
-                                            <td className="p-5">
-                                                <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${isPaid ? 'bg-green-100 text-green-700' :
-                                                        isPartial ? 'bg-blue-100 text-blue-700' :
-                                                            'bg-yellow-100 text-yellow-700'
-                                                    }`}>
-                                                    {isPaid ? 'Paid' : isPartial ? 'Partial' : 'Pending'}
-                                                </span>
-                                            </td>
-                                            <td className="p-5 text-center">
-                                                {isPaid ? (
-                                                    <span className="px-4 py-2 text-green-600 text-[10px] font-black uppercase tracking-widest">
-                                                        Cleared
-                                                    </span>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => handlePayNow(p)}
-                                                        disabled={loadingPaymentId === p.projectId}
-                                                        className={`px-4 py-2 border text-[10px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 shadow-lg flex items-center gap-2 ${loadingPaymentId === p.projectId
-                                                                ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
-                                                                : "bg-blue-600 border-blue-600 text-white hover:bg-blue-700 shadow-blue-100"
-                                                            }`}
-                                                    >
-                                                        {loadingPaymentId === p.projectId ? (
-                                                            <><Loader2 className="animate-spin" size={12} /> Loading...</>
-                                                        ) : (
-                                                            isPartial ? "Pay Remaining" : "Pay Now"
-                                                        )}
-                                                    </button>
-                                                )}
-                                            </td>
-                                            <td className="p-5 text-sm font-medium text-slate-500 italic">
-                                                {isPaid ? 'Payment fully cleared.' :
-                                                    isPartial ? '50% payment received. Pending remainder.' :
-                                                        'Initial payment is awaited.'}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            ) : (
-                <div className="bg-white p-12 rounded-3xl border border-dashed border-slate-200 text-center space-y-4">
-                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-200">
-                        <CreditCard size={40} />
-                    </div>
-                    <div className="space-y-2">
-                        <h4 className="text-xl font-bold text-slate-800">No Projects Found</h4>
-                        <p className="text-slate-500 max-w-xs mx-auto text-sm">Add a project using your Project ID to see payment statuses here.</p>
-                    </div>
-                </div>
-            )}
-
             <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100 flex items-start gap-4">
                 <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
                     <MessageSquare size={18} />
@@ -396,15 +526,20 @@ const PaymentsSection = ({ projects, user }: { projects: any[], user: any }) => 
         </div>
     );
 };
-;
 
 
 const ProjectsSection = ({ user, loading, projects }: { user: any; loading: boolean; projects: any[] }) => {
-    const [isAdding, setIsAdding] = useState(false);
-    const [projectIdInput, setProjectIdInput] = useState("");
+    const [projSearch, setProjSearch] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [error, setError] = useState<string | null>(null);
     const [lastSynced, setLastSynced] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const filteredProjects = projects.filter(p => {
+        const search = projSearch.toLowerCase();
+        const id = String(p.projectId || p.id || "").toLowerCase();
+        const name = String(p.projectName || p.title || "").toLowerCase();
+        return id.includes(search) || name.includes(search);
+    });
 
     const handleSyncData = async (silent = false) => {
         if (!user?.uid || projects.length === 0) return;
@@ -466,7 +601,7 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
                         projectStatus: matched['project status'] || matched['status'] || proj.projectStatus || proj.status || "Pending",
                         enquireDate: matched['enquire date'] || matched['date'] || proj.enquireDate || proj.date || "",
                         targetDate: matched['target date'] || matched['deadline'] || proj.targetDate || "N/A",
-                        payment: matched['payment'] || matched['amount'] || proj.payment || "0",
+                        payment: matched['total amount'] || matched['payment'] || matched['amount'] || proj.payment || "0",
                         paymentStatus: matched['payment status'] || matched['p-status'] || proj.paymentStatus || "Pending",
                         lastUpdated: serverTimestamp()
                     }, { merge: true });
@@ -481,78 +616,6 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
         }
     };
 
-    const handleAddProject = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const trimmedId = projectIdInput.trim();
-        if (!trimmedId) return;
-
-        // Check if project is already added
-        if (projects.some(p => p.projectId === trimmedId)) {
-            setError("Project ID already added to your list.");
-            setTimeout(() => {
-                setError(null);
-                setProjectIdInput("");
-                setIsAdding(false);
-            }, 3000);
-            return;
-        }
-
-        setIsSubmitting(true);
-        setError(null);
-
-        try {
-            const settingsDoc = await getDoc(doc(db, "settings", "dashboard"));
-            if (!settingsDoc.exists() || !settingsDoc.data().sheetUrl) {
-                throw new Error("System configuration missing.");
-            }
-
-            const sheetUrl = settingsDoc.data().sheetUrl;
-            const csvUrl = sheetUrl.replace('/pubhtml', '/pub') + (sheetUrl.includes('?') ? '&' : '?') + 'output=csv';
-
-            const response = await fetch(csvUrl);
-            const csvText = await response.text();
-
-            // Minimal parser
-            const rows = csvText.split(/\r?\n/).filter(row => row.trim());
-            const headers = rows[0].split(',').map(h => h.trim().toLowerCase());
-            const allData = rows.slice(1).map(row => {
-                const values = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"|"$/g, ''));
-                return headers.reduce((acc, header, i) => {
-                    acc[header] = values[i] || "";
-                    return acc;
-                }, {} as any);
-            });
-
-            const matched = allData.find(row => {
-                const rowId = row['project id'] || row['id'] || row['projectid'];
-                const rowEmail = row['email address'] || row['email'] || row['client email'];
-                return rowId === trimmedId && rowEmail?.toLowerCase() === user.email?.toLowerCase();
-            });
-
-            if (matched) {
-                await setDoc(doc(collection(db, "users", user.uid, "assignedProjects"), trimmedId), {
-                    projectId: trimmedId,
-                    projectName: matched['project name'] || matched['title'] || "Untitled Project",
-                    projectStatus: matched['project status'] || matched['status'] || "Pending",
-                    enquireDate: matched['enquire date'] || matched['date'] || "",
-                    targetDate: matched['target date'] || matched['deadline'] || "N/A",
-                    payment: matched['payment'] || matched['amount'] || "0",
-                    paymentStatus: matched['payment status'] || matched['p-status'] || "Pending",
-                    addedAt: serverTimestamp(),
-                    lastUpdated: serverTimestamp()
-                });
-                setProjectIdInput("");
-                setIsAdding(false);
-                handleSyncData(true);
-            } else {
-                setError("No project found with this ID and your email. Please check and try again.");
-            }
-        } catch (err: any) {
-            setError(err.message || "Failed to add project.");
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
@@ -569,56 +632,27 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
                         )}
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+                    <div className="relative w-full sm:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        <input
+                            type="text"
+                            placeholder="Search name or ID..."
+                            value={projSearch}
+                            onChange={(e) => setProjSearch(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm transition-all"
+                        />
+                    </div>
                     <button
                         onClick={() => handleSyncData()}
                         disabled={isSubmitting || projects.length === 0}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 font-bold text-sm rounded-xl border border-slate-200 shadow-sm hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white text-slate-700 font-bold text-sm rounded-xl border border-slate-200 shadow-sm hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50"
                     >
                         <RefreshCw size={16} className={isSubmitting ? "animate-spin" : ""} />
-                        Refresh Details
-                    </button>
-                    <button
-                        onClick={() => setIsAdding(!isAdding)}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white font-bold text-sm rounded-xl shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95"
-                    >
-                        {isAdding ? <X size={18} /> : <Plus size={18} />}
-                        {isAdding ? "Cancel" : "Add Project by ID"}
+                        Sync
                     </button>
                 </div>
             </div>
-
-            {isAdding && (
-                <div className="bg-white p-6 rounded-2xl shadow-xl border border-blue-100 animate-in zoom-in-95 duration-200">
-                    <form onSubmit={handleAddProject} className="flex flex-col md:flex-row gap-4">
-                        <div className="flex-1">
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Unique Project ID</label>
-                            <input
-                                type="text"
-                                value={projectIdInput}
-                                onChange={(e) => setProjectIdInput(e.target.value)}
-                                placeholder="For Example - 1001"
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-mono font-bold"
-                            />
-                        </div>
-                        <div className="md:pt-6">
-                            <button
-                                type="submit"
-                                disabled={isSubmitting || !projectIdInput.trim()}
-                                className="w-full md:w-auto px-8 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                                {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : "Verify & Add Project"}
-                            </button>
-                        </div>
-                    </form>
-                    {error && (
-                        <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm font-bold flex items-center gap-2 border border-red-100 animate-in shake-in duration-300">
-                            <X size={16} />
-                            {error}
-                        </div>
-                    )}
-                </div>
-            )}
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                 <div className="overflow-x-auto">
@@ -635,8 +669,8 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                            {projects.length > 0 ? (
-                                projects.map((proj, idx) => (
+                            {filteredProjects.length > 0 ? (
+                                filteredProjects.map((proj, idx) => (
                                     <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
                                         <td className="p-4">
                                             <span className="font-mono text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
@@ -663,7 +697,7 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
                                             </span>
                                         </td>
                                         <td className="p-4 text-center font-bold text-slate-700">
-                                            {proj.payment || '0'}
+                                            ₹{proj.totalAmount || proj.payment || '0'}
                                         </td>
                                         <td className="p-4 text-center">
                                             <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${(proj.paymentStatus)?.toLowerCase() === 'paid' ? 'bg-green-100 text-green-700' :
@@ -686,8 +720,8 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
                                         ) : (
                                             <div className="flex flex-col items-center gap-3">
                                                 <Package className="text-slate-200" size={48} />
-                                                <p className="text-slate-400 font-medium text-lg">No projects added yet.</p>
-                                                <p className="text-slate-400 text-sm max-w-xs">Use the "Add Project by ID" button to connect your active projects.</p>
+                                                <p className="text-slate-400 font-medium text-lg">No projects found.</p>
+                                                <p className="text-slate-400 text-sm max-w-xs">{projSearch ? "Try adjusting your search terms." : "You don't have any active projects yet."}</p>
                                             </div>
                                         )}
                                     </td>
@@ -738,21 +772,21 @@ const QuickGuideSection = () => {
 
                             <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100">
                                 <h4 className="font-bold text-blue-900 mb-4 flex items-center gap-2">
-                                    <div className="p-1.5 bg-blue-600 text-white rounded-lg"><Plus size={16} /></div>
-                                    How to Add Your Project:
+                                    <Search size={18} />
+                                    How to Find Your Project:
                                 </h4>
                                 <div className="space-y-4">
                                     <div className="flex gap-4">
                                         <div className="w-6 h-6 rounded-full bg-blue-200 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">1</div>
-                                        <p className="text-sm text-slate-700 font-medium">Click on the <span className="text-blue-600 font-bold">"Add Project by ID"</span> button at the top right of the Projects page.</p>
+                                        <p className="text-sm text-slate-700 font-medium">Use the <span className="text-blue-600 font-bold">Search Bar</span> at the top of the Projects section.</p>
                                     </div>
                                     <div className="flex gap-4">
                                         <div className="w-6 h-6 rounded-full bg-blue-200 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">2</div>
-                                        <p className="text-sm text-slate-700 font-medium">Enter your <span className="text-blue-600 font-bold">Unique Project ID</span> (e.g., 1001) provided by our team.</p>
+                                        <p className="text-sm text-slate-700 font-medium">Simply type your <span className="text-blue-600 font-bold">Project Name</span> or <span className="text-blue-600 font-bold">Project ID</span> to instantly filter the list.</p>
                                     </div>
                                     <div className="flex gap-4">
                                         <div className="w-6 h-6 rounded-full bg-blue-200 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">3</div>
-                                        <p className="text-sm text-slate-700 font-medium">Click <span className="text-blue-600 font-bold">"Verify & Add Project"</span>. The system will match the ID with your email and add it to your list.</p>
+                                        <p className="text-sm text-slate-700 font-medium">The table updates in real-time as you type, with no manual verification needed.</p>
                                     </div>
                                 </div>
                             </div>
@@ -1305,10 +1339,10 @@ export default function ClientDashboard() {
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
-        const sectionParam = params.get("section");
+        const sectionParam = params.get("section") || params.get("tab");
         const savedSection = localStorage.getItem("clientActiveSection");
 
-        if (sectionParam) {
+        if (sectionParam && menuItems.find(m => m.id === sectionParam)) {
             setActiveSection(sectionParam);
             localStorage.setItem("clientActiveSection", sectionParam);
         } else {
@@ -1327,6 +1361,7 @@ export default function ClientDashboard() {
     const [projects, setProjects] = useState<any[]>([]);
     const [tickets, setTickets] = useState<any[]>([]);
     const [notifications, setNotifications] = useState<any[]>([]);
+    const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
@@ -1373,7 +1408,8 @@ export default function ClientDashboard() {
 
                 return () => unsubscribeUser();
             } else {
-                router.push("/login");
+                const callback = encodeURIComponent(window.location.pathname + window.location.search);
+                router.push(`/login?callbackUrl=${callback}`);
             }
             setLoading(false);
         });
@@ -1396,6 +1432,7 @@ export default function ClientDashboard() {
                     const dateB = b.createdAt?.seconds || 0;
                     return dateB - dateA;
                 });
+            console.log("[Projects Trace] IDs & Amounts:", projectsList.map(p => `${p.projectId}: Total=${p.totalAmount}, Payment=${p.payment}`));
             setProjects(projectsList);
         }, (error) => {
             console.error("Projects Real-time Error:", error);
@@ -1455,6 +1492,16 @@ export default function ClientDashboard() {
         return () => unsubscribe();
     }, [user?.uid]);
 
+    useEffect(() => {
+        if (!user?.uid) return;
+        const q = query(collection(db, "paymentRequests"), where("clientId", "==", user.uid));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setPaymentRequests(list);
+        });
+        return () => unsubscribe();
+    }, [user?.uid]);
+
     const handleMarkAsRead = async (notificationId: string) => {
         try {
             const notifRef = doc(db, "notifications", notificationId);
@@ -1466,23 +1513,13 @@ export default function ClientDashboard() {
         }
     };
 
-    const menuItems = [
-        { id: "overview", label: "Overview", icon: LayoutDashboard },
-        { id: "profile", label: "My Profile", icon: User },
-        { id: "projects", label: "My Projects", icon: Package },
-        { id: "payments", label: "Payments", icon: CreditCard },
-        { id: "notifications", label: "Notifications", icon: Bell, badge: unreadCount },
-        { id: "support", label: "Support", icon: MessageSquare },
-        { id: "quick-guide", label: "Quick Guide", icon: FileText },
-        { id: "documents", label: "Documents", icon: FileText },
-    ];
 
     const renderContent = () => {
         switch (activeSection) {
             case "overview": return <OverviewSection user={user} projects={projects} tickets={tickets} loading={loading} />;
             case "profile": return <ProfileSection user={user} loading={loading} />;
             case "projects": return <ProjectsSection user={user} loading={loading} projects={projects} />;
-            case "payments": return <PaymentsSection projects={projects} user={user} />;
+            case "payments": return <PaymentsSection projects={projects} user={user} paymentRequests={paymentRequests} />;
             case "notifications": return <NotificationsSection notifications={notifications} onMarkAsRead={handleMarkAsRead} />;
             case "support": return <SupportSection user={user} tickets={tickets} />;
             case "quick-guide": return <QuickGuideSection />;
@@ -1508,9 +1545,9 @@ export default function ClientDashboard() {
                                 <item.icon size={20} />
                                 <span className="font-medium text-sm">{item.label}</span>
                             </div>
-                            {(item as any).badge > 0 && (
+                            {item.id === 'notifications' && unreadCount > 0 && (
                                 <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-                                    {(item as any).badge}
+                                    {unreadCount}
                                 </span>
                             )}
                         </button>

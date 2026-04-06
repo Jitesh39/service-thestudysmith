@@ -64,17 +64,27 @@ export const onForegroundMessage = () => {
       const notificationTitle = payload.notification?.title || "Notification from TheStudySmith";
       const notificationOptions = {
         body: payload.notification?.body || "Check your dashboard for updates.",
-        icon: '/logo1.png', // Using the 18KB version for performance
-        badge: '/logo1.png'
+        icon: '/logo1.png',
+        badge: '/logo1.png',
+        data: {
+          url: payload.data?.click_action || payload.fcmOptions?.link || "/dashboard/client"
+        }
       };
 
-      // This will show a system notification even if the tab is open
-      new Notification(notificationTitle, notificationOptions);
+      const notification = new Notification(notificationTitle, notificationOptions);
+      
+      notification.onclick = (event) => {
+        event.preventDefault();
+        window.focus();
+        const targetUrl = notification.data?.url || "/dashboard/client";
+        window.location.href = targetUrl;
+        notification.close();
+      };
     }
 
     // Optional: Keep the alert for debug or secondary confirmation
-    if (typeof window !== "undefined") {
-      alert(`Notification: ${payload.notification?.title}\n${payload.notification?.body}`);
-    }
+    // if (typeof window !== "undefined") {
+    //   alert(`Notification: ${payload.notification?.title}\n${payload.notification?.body}`);
+    // }
   });
 };

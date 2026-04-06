@@ -9,23 +9,34 @@ const razorpay = new Razorpay({
 
 export async function POST(req: Request) {
   try {
-    const { amount, userId, projectId, currency = "INR" } = await req.json();
+    const { amount, userId, projectId, requestId, currency = "INR" } = await req.json();
 
-    if (!amount || !userId || !projectId) {
+    if (!amount || !userId || (!projectId && !requestId)) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Verify project exists
-    const projectSnap = await db.collection("projects").doc(projectId).get();
-    if (!projectSnap.exists) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    let receipt = "";
+    if (requestId) {
+      // Verify payment request exists
+      const requestSnap = await db.collection("paymentRequests").doc(requestId).get();
+      if (!requestSnap.exists) {
+        return NextResponse.json({ error: "Payment request not found" }, { status: 404 });
+      }
+      receipt = `req_${requestId}_${Date.now()}`;
+    } else {
+      // Verify project exists - explicitly cast projectId to string
+      const stringProjectId = String(projectId);
+      const projectSnap = await db.collection("projects").doc(stringProjectId).get();
+      if (!projectSnap.exists) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
+      receipt = `project_${projectId}_${Date.now()}`;
     }
 
-    // Razorpay receives amounts in paise
     const options = {
       amount: Math.round(amount * 100),
       currency,
-      receipt: `project_${projectId}_${Date.now()}`,
+      receipt: receipt,
     };
 
     const order = await razorpay.orders.create(options);
@@ -33,7 +44,8 @@ export async function POST(req: Request) {
     // Save pending payment record
     await db.collection("payments").doc(order.id).set({
       userId,
-      projectId,
+      projectId: projectId || null,
+      requestId: requestId || null,
       orderId: order.id,
       amount,
       currency,

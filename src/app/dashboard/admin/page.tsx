@@ -52,6 +52,7 @@ import {
     Eye,
     EyeOff,
     Bell,
+    BellRing,
     Send,
     Pencil,
     FileText,
@@ -857,7 +858,7 @@ const ProfileSection = ({ user, loading, teamMembers }: { user: any; loading: bo
     );
 };
 
-const AdminProjectTracker = ({ teamMembers }: { teamMembers: any[] }) => {
+const AdminProjectTracker = ({ teamMembers, paymentRequests }: { teamMembers: any[], paymentRequests: any[] }) => {
     const [projects, setProjects] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isAdding, setIsAdding] = useState(false);
@@ -880,13 +881,31 @@ const AdminProjectTracker = ({ teamMembers }: { teamMembers: any[] }) => {
     });
 
     useEffect(() => {
-        const q = query(collection(db, "projects"), orderBy("projectId", "asc"));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setProjects(list);
+        const q = query(collection(db, "projects"));
+        const unsubscribeProjects = onSnapshot(q, (snapshot) => {
+            const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+
+            // Premium Sorting Logic: Descending Order (Newest First)
+            const sortedList = [...list].sort((a, b) => {
+                // Handle string vs number projectId conversion
+                const idA = parseInt(String(a.projectId || 0));
+                const idB = parseInt(String(b.projectId || 0));
+
+                if (idB !== idA) {
+                    return idB - idA; // Higher IDs first
+                }
+
+                // Fallback to createdAt timestamp for identical/missing IDs
+                const timeA = a.createdAt?.seconds || 0;
+                const timeB = b.createdAt?.seconds || 0;
+                return timeB - timeA;
+            });
+
+            setProjects(sortedList);
             setLoading(false);
         });
-        return () => unsubscribe();
+
+        return () => unsubscribeProjects();
     }, []);
 
     const handleUpdateField = async (id: string, field: string, value: any) => {
@@ -1109,7 +1128,7 @@ const AdminProjectTracker = ({ teamMembers }: { teamMembers: any[] }) => {
                                 <td className="p-3 text-xs font-black text-green-600">₹{p.paidAmount || 0}</td>
                                 <td className="p-3">
                                     <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tight ${p.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' :
-                                        p.paymentStatus === 'partial' ? 'bg-blue-100 text-blue-700' :
+                                        (p.paymentStatus === 'partial' || p.paymentStatus === 'partial_paid') ? 'bg-blue-100 text-blue-700' :
                                             'bg-yellow-100 text-yellow-700'
                                         }`}>
                                         {p.paymentStatus || 'pending'}
@@ -1158,9 +1177,355 @@ const AdminProjectTracker = ({ teamMembers }: { teamMembers: any[] }) => {
     );
 };
 
-const AdminPaymentsSection = ({ projects }: { projects: any[] }) => {
+const AdminPaymentsSection = ({ projects, paymentRequests, allUsers, user }: { projects: any[], paymentRequests: any[], allUsers: any[], user: any }) => {
+    const [showRequestModal, setShowRequestModal] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editingRequestId, setEditingRequestId] = useState<string | null>(null);
+    const [clientSearch, setClientSearch] = useState("");
+    const [isSelectingClient, setIsSelectingClient] = useState(false);
+    const [newRequest, setNewRequest] = useState({
+        clientId: "",
+        clientEmail: "",
+        title: "",
+        amount: 0,
+        description: "",
+        projectId: ""
+    });
+
+    const filteredClients = allUsers.filter(u => {
+        if (u.role === 'admin') return false;
+        if (!clientSearch) return true;
+        const name = (u.displayName || u.name || "").toLowerCase();
+        const email = (u.email || "").toLowerCase();
+        const search = clientSearch.toLowerCase();
+        return name.startsWith(search) || email.startsWith(search);
+    });
+
+    const handleSendRequest = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newRequest.clientId || !newRequest.amount || newRequest.amount <= 0) {
+            alert("Please select a client and enter a valid amount.");
+            return;
+        }
+
+        try {
+            let currentRequestId = editingRequestId;
+            if (isEditing && editingRequestId) {
+                await updateDoc(doc(db, "paymentRequests", editingRequestId), {
+                    ...newRequest,
+                    updatedAt: serverTimestamp()
+                });
+            } else {
+                const reqRef = collection(db, "paymentRequests");
+                const docRef = await addDoc(reqRef, {
+                    ...newRequest,
+                    status: "pending",
+                    type: "payment_request",
+                    createdAt: serverTimestamp()
+                });
+                currentRequestId = docRef.id;
+
+                // 🔔 Trigger Push Notification for New Request
+                const recipient = allUsers.find(u => u.uid === newRequest.clientId);
+                if (recipient && recipient.fcmToken) {
+                    const title = "New Payment Request";
+                    const body = `₹${newRequest.amount} payment requested for ${newRequest.title}. Tap to pay now.`;
+                    const redirectUrl = `/dashboard/client?tab=payments&requestId=${currentRequestId}`;
+
+                    fetch("/api/send-fcm", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            token: recipient.fcmToken,
+                            title,
+                            body,
+                            clickAction: redirectUrl,
+                            data: {
+                                type: "payment_request",
+                                requestId: currentRequestId,
+                                redirectUrl: redirectUrl
+                            }
+                        }),
+                    }).catch(err => console.error("FCM Send Error:", err));
+                }
+
+                // Also save to notifications collection for dashboard history
+                await addDoc(collection(db, "notifications"), {
+                    title: "New Payment Request",
+                    message: `₹${newRequest.amount} payment requested for ${newRequest.title}.`,
+                    clickAction: `/dashboard/client?tab=payments&requestId=${currentRequestId}`,
+                    receiverId: newRequest.clientId,
+                    receiverEmail: newRequest.clientEmail,
+                    receiverName: recipient?.displayName || recipient?.name || newRequest.clientEmail,
+                    receiverType: "client",
+                    senderId: user?.uid || "admin",
+                    senderName: user?.displayName || "Admin",
+                    senderPhoto: user?.profileImage || user?.photoURL || null,
+                    isRead: false,
+                    type: "payment_request",
+                    requestId: currentRequestId,
+                    timestamp: serverTimestamp()
+                });
+            }
+            setShowRequestModal(false);
+            setIsEditing(false);
+            setEditingRequestId(null);
+            setNewRequest({ clientId: "", clientEmail: "", title: "", amount: 0, description: "", projectId: "" });
+            setClientSearch("");
+        } catch (error) {
+            console.error("Error saving request:", error);
+            alert("Failed to save payment request.");
+        }
+    };
+
+    // Deep Linking: Scroll to specific request and highlight
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const requestId = params.get("requestId");
+        if (requestId && paymentRequests.length > 0) {
+            const timer = setTimeout(() => {
+                const element = document.getElementById(`request-${requestId}`);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    element.classList.add('bg-blue-50/80', 'ring-2', 'ring-blue-500/20');
+                    setTimeout(() => {
+                        element.classList.remove('bg-blue-50/80', 'ring-2', 'ring-blue-500/20');
+                    }, 5000);
+                }
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [paymentRequests]);
+
+    const handleDeleteRequest = async (id: string) => {
+        if (!window.confirm("Are you sure you want to delete this payment request?")) return;
+        try {
+            await deleteDoc(doc(db, "paymentRequests", id));
+        } catch (error) {
+            console.error("Error deleting request:", error);
+            alert("Failed to delete request.");
+        }
+    };
+
+    const openEditModal = (req: any) => {
+        setNewRequest({
+            clientId: req.clientId,
+            clientEmail: req.clientEmail,
+            title: req.title,
+            amount: req.amount,
+            description: req.description || "",
+            projectId: req.projectId || ""
+        });
+        setEditingRequestId(req.id);
+        setIsEditing(true);
+        setShowRequestModal(true);
+    };
+
     return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Payment Requests Section */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-white">
+                    <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                        <BellRing size={20} className="text-orange-500" />
+                        Manual Payment Requests
+                    </h3>
+                    <button
+                        onClick={() => setShowRequestModal(true)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-blue-100 flex items-center gap-2 transition-all active:scale-95"
+                    >
+                        <Plus size={16} /> Send Payment Request
+                    </button>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50/50 border-b border-slate-50">
+                            <tr>
+                                <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Client</th>
+                                <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Project ID</th>
+                                <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Title</th>
+                                <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
+                                <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                                <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
+                                <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {paymentRequests.length > 0 ? (
+                                paymentRequests.map((req: any, i: number) => (
+                                    <tr key={req.id || i} id={`request-${req.id}`} className="hover:bg-slate-50/50 transition-all duration-300">
+                                        <td className="p-5">
+                                            <p className="text-xs font-bold text-slate-700">{req.clientEmail}</p>
+                                        </td>
+                                        <td className="p-5">
+                                            <span className="font-mono text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                                {req.projectId || "General"}
+                                            </span>
+                                        </td>
+                                        <td className="p-5">
+                                            <p className="text-sm font-medium text-slate-600">{req.title}</p>
+                                        </td>
+                                        <td className="p-5">
+                                            <p className="text-sm font-black text-slate-900">₹{req.amount}</p>
+                                        </td>
+                                        <td className="p-5">
+                                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${req.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                                                {req.status}
+                                            </span>
+                                        </td>
+                                        <td className="p-5 text-xs text-slate-400 font-medium">
+                                            {req.createdAt ? new Date(req.createdAt.seconds * 1000).toLocaleDateString() : 'Just now'}
+                                        </td>
+                                        <td className="p-5 text-center">
+                                            <div className="flex items-center justify-center gap-2">
+                                                <button
+                                                    onClick={() => openEditModal(req)}
+                                                    className="p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                                    title="Edit Request"
+                                                >
+                                                    <Pencil size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteRequest(req.id)}
+                                                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                    title="Delete Request"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr><td colSpan={7} className="p-10 text-center text-slate-400 text-sm font-medium">No payment requests sent yet.</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* Modal */}
+            {showRequestModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-8 space-y-6">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-2xl font-black text-slate-900">{isEditing ? 'Edit' : 'Send'} <span className="text-blue-600">Payment Request</span></h3>
+                            <button
+                                onClick={() => {
+                                    setShowRequestModal(false);
+                                    setIsEditing(false);
+                                    setEditingRequestId(null);
+                                    setNewRequest({ clientId: "", clientEmail: "", title: "", amount: 0, description: "", projectId: "" });
+                                    setClientSearch("");
+                                    setIsSelectingClient(false);
+                                }}
+                                className="text-slate-400 hover:text-slate-900"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+                        <form onSubmit={handleSendRequest} className="space-y-4">
+                            <div className="space-y-1 relative">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Select Client</label>
+
+                                <div className="relative">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsSelectingClient(!isSelectingClient)}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-left outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between transition-all"
+                                    >
+                                        <span className={newRequest.clientEmail ? "text-slate-700 font-bold" : "text-slate-400 font-medium"}>
+                                            {newRequest.clientEmail ? `${newRequest.clientEmail} (${allUsers.find(u => u.uid === newRequest.clientId)?.displayName || allUsers.find(u => u.uid === newRequest.clientId)?.name || 'No Name'})` : "Choose a client..."}
+                                        </span>
+                                        <ChevronDown className={`text-slate-400 transition-transform ${isSelectingClient ? 'rotate-180' : ''}`} size={18} />
+                                    </button>
+
+                                    {isSelectingClient && (
+                                        <div className="absolute z-[110] w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                            <div className="p-3 border-b border-slate-50">
+                                                <div className="relative">
+                                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                                    <input
+                                                        autoFocus
+                                                        type="text"
+                                                        placeholder="Search name or email..."
+                                                        className="w-full bg-slate-50 border-none rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 font-medium"
+                                                        value={clientSearch}
+                                                        onChange={(e) => setClientSearch(e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="max-h-[250px] overflow-y-auto p-1 py-2 divide-y divide-slate-50">
+                                                {filteredClients.length > 0 ? (
+                                                    filteredClients.map((u) => (
+                                                        <button
+                                                            key={u.uid}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setNewRequest({ ...newRequest, clientId: u.uid, clientEmail: u.email || "" });
+                                                                setIsSelectingClient(false);
+                                                                setClientSearch("");
+                                                            }}
+                                                            className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-left transition-colors first:rounded-t-xl last:rounded-b-xl ${newRequest.clientId === u.uid ? 'bg-blue-50' : ''}`}
+                                                        >
+                                                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-black">
+                                                                {(u.displayName || u.name || u.email || "C").charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className={`text-xs font-black truncate ${newRequest.clientId === u.uid ? 'text-blue-700' : 'text-slate-800'}`}>
+                                                                    {u.displayName || u.name || 'No Name'}
+                                                                </p>
+                                                                <p className="text-[10px] text-slate-400 font-bold truncate">{u.email}</p>
+                                                            </div>
+                                                        </button>
+                                                    ))
+                                                ) : (
+                                                    <div className="p-8 text-center">
+                                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">No clients found</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Link to Project (Optional)</label>
+                                <select
+                                    value={newRequest.projectId}
+                                    onChange={(e) => setNewRequest({ ...newRequest, projectId: e.target.value })}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700"
+                                >
+                                    <option value="">No specific project (General Payment)</option>
+                                    {[...new Set(projects.map(p => p.projectId || p.id))].sort().map(pid => (
+                                        <option key={pid} value={pid}>Project ID: {pid}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Title</label>
+                                    <input required type="text" placeholder="e.g. Domain Renewal" value={newRequest.title} onChange={(e) => setNewRequest({ ...newRequest, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Amount (₹)</label>
+                                    <input required type="number" placeholder="500" value={newRequest.amount} onChange={(e) => setNewRequest({ ...newRequest, amount: parseFloat(e.target.value) })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Description (Optional)</label>
+                                <textarea rows={3} placeholder="Brief details about this request..." value={newRequest.description} onChange={(e) => setNewRequest({ ...newRequest, description: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+                            </div>
+                            <button type="submit" className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-xl hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+                                <Send size={18} /> {isEditing ? 'Update Request' : 'Send Request'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Projects Table */}
             {projects.length > 0 ? (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                     <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-white">
@@ -1185,6 +1550,7 @@ const AdminPaymentsSection = ({ projects }: { projects: any[] }) => {
                                 {projects.map((p, i) => {
                                     const status = p.paymentStatus?.toLowerCase();
                                     const isPaid = status === 'paid' || status === 'full paid';
+                                    const isPartial = status === 'partial' || status === 'partial_paid';
                                     const isHalf = status?.includes('50%');
                                     const isPending = status === 'pending';
 
@@ -2702,7 +3068,7 @@ export default function AdminDashboard() {
     // Persist active section on refresh
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
-        const sectionParam = params.get("section");
+        const sectionParam = params.get("section") || params.get("tab");
         const savedSection = localStorage.getItem("adminActiveSection");
 
         if (sectionParam) {
@@ -2733,6 +3099,16 @@ export default function AdminDashboard() {
     const router = useRouter();
 
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
+
+    useEffect(() => {
+        const reqQ = query(collection(db, "paymentRequests"), orderBy("createdAt", "desc"));
+        const unsubscribe = onSnapshot(reqQ, (snapshot) => {
+            const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setPaymentRequests(list);
+        });
+        return () => unsubscribe();
+    }, []);
 
     // Auth State Observer
     useEffect(() => {
@@ -2771,7 +3147,8 @@ export default function AdminDashboard() {
                     console.error("Error fetching admin profile:", error);
                 }
             } else {
-                router.push("/login");
+                const callback = encodeURIComponent(window.location.pathname + window.location.search);
+                router.push(`/login?callbackUrl=${callback}`);
             }
             setLoading(false);
         });
@@ -2974,13 +3351,13 @@ export default function AdminDashboard() {
                     onDeleteMember={handleDeleteTeamMember}
                 />
             );
-            case "projects": return <AdminProjectTracker teamMembers={teamMembers} />;
+            case "projects": return <AdminProjectTracker teamMembers={teamMembers} paymentRequests={paymentRequests} />;
             case "active-ids": return <AssignedProjectsSection projects={globalProjects} users={allUsers} onDelete={handleDeleteProjectID} isSuperAdmin={isSuperAdmin} />;
             case "notifications": return <AdminNotificationsSection user={user} allUsers={allUsers} />;
             case "users":
                 if (user?.role === 'Team_Member') return <div className="p-8 text-center text-red-500 font-bold">Access Denied: Admin Only</div>;
                 return <UsersSection users={allUsers} totalUsers={totalUsers} onDelete={handleDeleteUser} currentUserEmail={user?.email} />;
-            case "payments": return <AdminPaymentsSection projects={globalProjects} />;
+            case "payments": return <AdminPaymentsSection projects={globalProjects} paymentRequests={paymentRequests} allUsers={allUsers} user={user} />;
             case "support": return <AdminSupportSection />;
             case "blog-management": return <BlogManagementSection user={user} />;
             case "finance":
