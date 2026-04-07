@@ -26,6 +26,7 @@ import InquiryForm from "@/components/InquiryForm";
 import TiltWrapper from "@/components/TiltWrapper";
 import { FadeUp, ScaleIn } from "@/components/MotionWrappers";
 import PublishedProjects from "@/components/PublishedProjects";
+import IndustriesSection from "@/components/IndustriesSection";
 
 export default function Home() {
   const faqs = [
@@ -121,75 +122,115 @@ export default function Home() {
         <div className="container">
           <div className="text-center mb-16">
             <h2 className="section-title">What We Offer</h2>
-            <p className="section-subtitle">We provide complete web development projects with proper structure and documentation.</p>
+            <p className="section-subtitle">We provide full-stack web development, AI voice assistant solutions, and complete projects for college students with proper structure and documentation.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <TiltWrapper>
               <div className="card h-full">
                 <div className="feature-icon"><FileCode size={24} /></div>
-                <h3 className="text-xl font-bold mb-3">Complete Project Package</h3>
-                <p>A complete, well-structured project package delivered seamlessly.</p>
+                <h3 className="text-xl font-bold mb-3">Custom Web Solutions</h3>
+                <p className="mb-3">
+                  We build modern, responsive, and high-performance websites tailored to your business needs.
+                </p>
+                <ul className="text-sm space-y-1 text-gray-600">
+                  <li>• Responsive Website Design</li>
+                  <li>• Full Stack Development</li>
+                  <li>• Admin Dashboard & CMS</li>
+                  <li>• SEO Optimized Structure</li>
+                </ul>
               </div>
             </TiltWrapper>
             <TiltWrapper>
               <div className="card h-full">
                 <div className="feature-icon"><BookOpen size={24} /></div>
-                <h3 className="text-xl font-bold mb-3">Complete Documentation</h3>
-                <p>Includes SRS, DFDs, ER Diagrams, and Project Reports required for submission.</p>
+                <h3 className="text-xl font-bold mb-3">Mobile App Solutions</h3>
+                <p className="mb-3">
+                  From idea to launch, we develop powerful and user-friendly mobile applications.
+                </p>
+                <ul className="text-sm space-y-1 text-gray-600">
+                  <li>• Android & iOS Apps</li>
+                  <li>• User Authentication</li>
+                  <li>• API Integration</li>
+                  <li>• Real-time Features</li>
+                </ul>
               </div>
             </TiltWrapper>
             <TiltWrapper>
               <div className="card h-full">
                 <div className="feature-icon"><MonitorPlay size={24} /></div>
-                <h3 className="text-xl font-bold mb-3">Industry-Ready Live Project</h3>
-                <p>Get a live, end-to-end project with complete features, real workflows, and smooth performance.</p>
+                <h3 className="text-xl font-bold mb-3">AI Voice Assistant</h3>
+                <p className="mb-3">
+                  Automate customer interactions with AI-powered calling solutions.
+                </p>
+                <ul className="text-sm space-y-1 text-gray-600">
+                  <li>• Automated Voice Calls</li>
+                  <li>• Lead Handling & Follow-ups</li>
+                  <li>• Customer Support Automation</li>
+                  <li>• Smart AI Conversations</li>
+                </ul>
               </div>
             </TiltWrapper>
           </div>
         </div>
       </section>
 
-      {/* Technologies */}
-      <section id="technologies" className="section-padding bg-white">
+      {/* Industries Section */}
+      <IndustriesSection />
+
+      {/* About Section */}
+      <section className="py-24 bg-white">
         <div className="container">
-          <div className="flex flex-col md:flex-row gap-12 items-center">
-            <div className="md:w-1/2">
-              <h2 className="section-title">Technologies Covered</h2>
-              <p className="text-slate-600 mb-6 text-lg">
-                We build projects using the latest industry-standard technologies to ensure your project looks modern and functions perfectly.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                {["HTML5", "CSS3", "JavaScript", "React.js", "Next.js", "Node.js", "Express", "MongoDB", "MySQL", "Firebase", "Tailwind"].map(tech => (
-                  <span key={tech} className="tech-pill">{tech}</span>
-                ))}
+          <div className="grid md:grid-cols-2 gap-16 items-center">
+            <FadeUp>
+              <div className="relative group">
+                <div className="absolute -inset-4 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-[2rem] blur-2xl opacity-10 group-hover:opacity-20 transition-opacity"></div>
+                <div className="relative aspect-square md:aspect-auto md:h-[500px] bg-slate-100 rounded-[2rem] overflow-hidden border border-slate-200">
+                  <img
+                    src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&q=80&w=1000"
+                    alt="Digital Excellence"
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent"></div>
+                  <div className="absolute bottom-8 left-8 right-8 text-white">
+                    <div className="text-4xl font-black mb-2">50+</div>
+                    <div className="text-sm font-medium opacity-80 uppercase tracking-widest">Projects Delivered Successfully</div>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="md:w-1/2 grid grid-cols-2 gap-4">
-              <TiltWrapper>
-                <div className="p-6 bg-blue-50 rounded-2xl text-center h-full">
-                  <Globe className="mx-auto text-blue-500 mb-2" size={32} />
-                  <div className="font-bold text-slate-700">Frontend</div>
+            </FadeUp>
+
+            <div>
+              <FadeUp delay={0.2}>
+                <h2 className="text-3xl md:text-5xl font-bold text-slate-900 mb-6 tracking-tight">
+                  About <span className="text-blue-600 tracking-tighter">TheStudySmith</span>
+                </h2>
+                <div className="space-y-6 text-slate-600 text-lg leading-relaxed">
+                  <p>
+                    TheStudySmith is a platform focused on delivering high-quality web development projects. We specialize in creating modern, responsive, and user-friendly websites tailored to client needs.
+                  </p>
+                  <p>
+                    Our goal is to provide efficient and scalable web solutions that help individuals, startups, and businesses grow online. We believe in the power of clean code and exceptional design to bridge the gap between ideas and reality.
+                  </p>
                 </div>
-              </TiltWrapper>
-              <TiltWrapper>
-                <div className="p-6 bg-green-50 rounded-2xl text-center h-full">
-                  <Server className="mx-auto text-green-500 mb-2" size={32} />
-                  <div className="font-bold text-slate-700">Backend</div>
+
+                <div className="grid grid-cols-2 gap-6 mt-10">
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div className="text-blue-600 font-bold text-2xl mb-1">{new Date().getFullYear() - 2023}+</div>
+                    <div className="text-slate-500 text-sm font-medium">Years Experience</div>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div className="text-blue-600 font-bold text-2xl mb-1">24/7</div>
+                    <div className="text-slate-500 text-sm font-medium">Support Available</div>
+                  </div>
                 </div>
-              </TiltWrapper>
-              <TiltWrapper>
-                <div className="p-6 bg-amber-50 rounded-2xl text-center h-full">
-                  <Database className="mx-auto text-amber-500 mb-2" size={32} />
-                  <div className="font-bold text-slate-700">Database</div>
+
+                <div className="mt-10">
+                  <Link href="/about" className="btn btn-primary inline-flex items-center gap-2 px-8 py-3.5 rounded-2xl shadow-lg shadow-blue-100 transform hover:scale-105 transition-all">
+                    Read More About Us <ArrowRight size={18} />
+                  </Link>
                 </div>
-              </TiltWrapper>
-              <TiltWrapper>
-                <div className="p-6 bg-purple-50 rounded-2xl text-center h-full">
-                  <Code2 className="mx-auto text-purple-500 mb-2" size={32} />
-                  <div className="font-bold text-slate-700">Full Stack</div>
-                </div>
-              </TiltWrapper>
+              </FadeUp>
             </div>
           </div>
         </div>

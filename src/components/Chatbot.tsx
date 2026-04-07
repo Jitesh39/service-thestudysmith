@@ -43,6 +43,12 @@ export default function ChatBot() {
     };
 
     useEffect(() => {
+        const handleOpen = () => setIsOpen(true);
+        window.addEventListener("open-thestudysmith-chatbot", handleOpen);
+        return () => window.removeEventListener("open-thestudysmith-chatbot", handleOpen);
+    }, []);
+
+    useEffect(() => {
         scrollToBottom();
     }, [messages, isOpen]);
 
@@ -179,49 +185,49 @@ export default function ChatBot() {
 
     return (
         <>
+            {/* Backdrop Blur Overlay (Mobile & Desktop) */}
+            <div
+                className={cn(
+                    "fixed inset-0 z-[34] bg-slate-900/10 backdrop-blur-[2px] transition-all duration-500 pointer-events-none md:bg-transparent md:backdrop-blur-0",
+                    isOpen ? "opacity-100 pointer-events-auto" : "opacity-0"
+                )}
+                onClick={() => setIsOpen(false)}
+            />
+
             {/* Toggle Button Wrapper */}
             <div className={cn("fixed bottom-24 right-9 md:bottom-12 md:right-9 z-30 flex items-center justify-center group transition-all duration-500 [.menu-open_&]:opacity-0 [.menu-open_&]:scale-50 [.menu-open_&]:pointer-events-none", isOpen && "pointer-events-none")}>
                 <button
                     suppressHydrationWarning={true}
                     onClick={() => setIsOpen(!isOpen)}
+                    onMouseEnter={() => window.dispatchEvent(new CustomEvent("show-thestudysmith-chatbot-helper"))}
                     className={cn(
                         "w-12 h-12 flex items-center justify-center rounded-full bg-slate-900 text-white shadow-2xl transition-all duration-300 hover:bg-slate-800 hover:scale-105",
                         isOpen ? "rotate-90 opacity-0" : "rotate-0 opacity-100"
                     )}
                 >
-                    <MessageSquare size={24} />
+                    <span className="text-[26px] leading-none mb-1">🤖</span>
                     <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping"></span>
                     <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full"></span>
                 </button>
 
-                {/* Tooltip Label */}
-                <div
-                    className={cn(
-                        "absolute right-16 top-1/2 -translate-y-1/2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-xl shadow-xl border border-slate-200 hidden md:block transition-all duration-300 transform",
-                        isOpen ? "opacity-0 translate-x-4 pointer-events-none" : "opacity-0 translate-x-4 group-hover:opacity-100 group-hover:translate-x-0"
-                    )}
-                >
-                    <p className="whitespace-nowrap font-bold text-slate-700 text-sm">Need Help? Ask AI!</p>
-                    <div className="absolute top-1/2 -right-1 w-2 h-2 bg-white transform -translate-y-1/2 rotate-45 border-t border-r border-slate-200"></div>
-                </div>
+
             </div>
 
             {/* Chat Window */}
             <div
                 className={cn(
-                    "fixed bottom-32 right-8 z-30 w-[400px] max-w-[calc(100vw-5rem)] bg-white rounded-2xl shadow-2xl border border-slate-100 flex flex-col transition-all duration-500 origin-bottom-right overflow-hidden [.menu-open_&]:opacity-0 [.menu-open_&]:scale-50 [.menu-open_&]:pointer-events-none",
+                    "fixed bottom-20 right-8 z-[35] w-[400px] max-w-[calc(100vw-5rem)] bg-white rounded-2xl shadow-2xl border border-slate-100 flex flex-col transition-all duration-500 origin-bottom-right overflow-hidden [.menu-open_&]:opacity-0 [.menu-open_&]:scale-50 [.menu-open_&]:pointer-events-none",
                     isOpen
                         ? "scale-100 opacity-100 translate-y-0"
                         : "scale-90 opacity-0 translate-y-10 pointer-events-none"
                 )}
-                style={{ height: "600px", maxHeight: "80vh" }}
+                style={{ height: "550px", maxHeight: "70vh" }}
             >
                 {/* Header */}
                 <div className="bg-slate-900 p-4 flex items-center justify-between text-white shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center relative">
-                            <Bot size={24} />
-                            {/* <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-slate-900 rounded-full"></span> */}
+                        <div className="w-10 h-10 flex items-center justify-center relative text-xl">
+                            🤖
                         </div>
                         <div>
                             <h3 className="font-bold text-sm">StudySmith Assistant</h3>
@@ -374,7 +380,7 @@ export default function ChatBot() {
                     <div className="text-center mt-4 mb-2 flex items-center justify-center gap-1 text-xs text-slate-800">
                         Powered by
                         <Link
-                            href="https://thestudysmith9.wordpress.com"
+                            href="https://thestudysmith.com"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="hover:text-blue-600 transition-colors font-semibold"
@@ -384,7 +390,7 @@ export default function ChatBot() {
                                 target.classList.add("animate-pulse", "text-blue-500");
                                 setTimeout(() => {
                                     target.classList.remove("animate-pulse", "text-blue-500");
-                                    window.open("https://thestudysmith9.wordpress.com", "_blank");
+                                    window.open("https://thestudysmith.com", "_blank");
                                 }, 500);
                             }}
                         >

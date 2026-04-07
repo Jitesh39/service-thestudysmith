@@ -9,6 +9,8 @@ import ScrollToTop from "@/components/ScrollToTop";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import Chatbot from "@/components/Chatbot";
 import NotificationHandler from "@/components/NotificationHandler";
+import WelcomeToast from "@/components/WelcomeToast";
+import ChatbotHelper from "@/components/ChatbotHelper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -46,6 +48,8 @@ export default function RootLayout({
             <ScrollToTop />
             <WhatsAppButton />
             <Chatbot />
+            <WelcomeToast />
+            <ChatbotHelper />
           </>
         )}
       </body>

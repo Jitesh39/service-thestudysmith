@@ -15,7 +15,6 @@ const navLinks = [
     { name: "About Us", href: "/about" },
     { name: "Services", href: "/#projects" },
     { name: "Demo Project", href: "/demo-projects" },
-    { name: "Technologies", href: "/#technologies" },
     { name: "Why Us", href: "/#why-us" },
     { name: "Blog", href: "/blog" },
     { name: "FAQ", href: "/#faq" },
