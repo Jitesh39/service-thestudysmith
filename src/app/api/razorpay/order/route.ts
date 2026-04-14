@@ -22,15 +22,24 @@ export async function POST(req: Request) {
       if (!requestSnap.exists) {
         return NextResponse.json({ error: "Payment request not found" }, { status: 404 });
       }
-      receipt = `req_${requestId}_${Date.now()}`;
+      // Razorpay receipt limit is 40 chars. Use shorter prefix and trimmed ID.
+      receipt = `rcpt_req_${requestId.substring(0, 15)}_${Date.now()}`;
     } else {
-      // Verify project exists - explicitly cast projectId to string
+      // Verify project exists - check both projects and projectTracker collections
       const stringProjectId = String(projectId);
-      const projectSnap = await db.collection("projects").doc(stringProjectId).get();
+      let projectSnap = await db.collection("projects").doc(stringProjectId).get();
+
+      // If not in projects (legacy/demo), check projectTracker (active clients)
       if (!projectSnap.exists) {
+        projectSnap = await db.collection("projectTracker").doc(stringProjectId).get();
+      }
+
+      if (!projectSnap.exists) {
+        console.error(`[Order API Error] Project ${stringProjectId} not found in projects or projectTracker`);
         return NextResponse.json({ error: "Project not found" }, { status: 404 });
       }
-      receipt = `project_${projectId}_${Date.now()}`;
+      // Razorpay receipt limit is 40 chars. Use shorter prefix and trimmed ID.
+      receipt = `rcpt_pj_${stringProjectId.substring(0, 15)}_${Date.now()}`;
     }
 
     const options = {

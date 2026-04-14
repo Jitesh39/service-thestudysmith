@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     // 2. Atomic Update using Transaction
     let clientName = "A client";
     let serviceTitle = "a service";
-    
+
     await db.runTransaction(async (transaction) => {
       // Get User Info
       const userRef = db.collection("users").doc(userId);
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
         const requestRef = db.collection("paymentRequests").doc(requestId);
         const requestDoc = await transaction.get(requestRef);
         if (!requestDoc.exists) throw new Error("Payment request not found.");
-        
+
         const reqData = requestDoc.data()!;
         serviceTitle = reqData.title || "Manual Invoice";
 
@@ -60,30 +60,61 @@ export async function POST(req: Request) {
       } else {
         // CASE B: PROJECT BALANCE PAYMENT
         const stringProjectId = String(projectId);
-        const projectRef = db.collection("projects").doc(stringProjectId);
-        const projectDoc = await transaction.get(projectRef);
+        let collectionName = "projects";
+        let projectRef = db.collection("projects").doc(stringProjectId);
+        let projectDoc = await transaction.get(projectRef);
+
+        // Fallback to projectTracker if not in legacy projects
+        if (!projectDoc.exists) {
+          projectRef = db.collection("projectTracker").doc(stringProjectId);
+          projectDoc = await transaction.get(projectRef);
+          collectionName = "projectTracker";
+        }
 
         if (!projectDoc.exists) {
           throw new Error(`Project ${stringProjectId} not found in records.`);
         }
 
         const pData = projectDoc.data()!;
-        serviceTitle = pData.projectName || pData.title || `Project ${stringProjectId}`;
-        const totalAmount = parseFloat(pData.totalAmount) || 0;
-        const currentPaid = parseFloat(pData.paidAmount) || 0;
+        serviceTitle = pData.clientProject?.projectName || pData.projectName || pData.title || `Project ${stringProjectId}`;
+
+        let totalAmount = 0;
+        let currentPaid = 0;
+
+        if (collectionName === "projectTracker") {
+          totalAmount = parseFloat(pData.clientProject?.totalAmount) || 0;
+          currentPaid = parseFloat(pData.clientProject?.receivedAmount) || 0;
+        } else {
+          totalAmount = parseFloat(pData.totalAmount) || 0;
+          currentPaid = parseFloat(pData.paidAmount) || 0;
+        }
+
         const newPaidAmount = currentPaid + parseFloat(amount);
         const remainingBalance = totalAmount - newPaidAmount;
 
-        let newStatus = "partial_paid";
-        if (newPaidAmount >= totalAmount || remainingBalance <= 0) {
-          newStatus = "paid";
-        }
+        if (collectionName === "projectTracker") {
+          const newStatus = (newPaidAmount >= totalAmount || remainingBalance <= 0) ? "paid" : "partial";
 
-        transaction.update(projectRef, {
-          paidAmount: Math.round(newPaidAmount),
-          paymentStatus: newStatus,
-          lastPaymentAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+          transaction.update(projectRef, {
+            "clientProject.receivedAmount": Math.round(newPaidAmount),
+            "clientProject.paymentStatus": newStatus,
+            "clientProject.lastPaymentAt": admin.firestore.FieldValue.serverTimestamp(),
+            // Log this transaction in payment history
+            paymentHistory: admin.firestore.FieldValue.arrayUnion({
+              amount: parseFloat(amount),
+              method: "Online",
+              date: new Date().toISOString(),
+              note: `Razorpay Payment ID: ${razorpay_payment_id}. Verified Online Payment.`
+            })
+          });
+        } else {
+          const newStatus = (newPaidAmount >= totalAmount || remainingBalance <= 0) ? "paid" : "partial_paid";
+          transaction.update(projectRef, {
+            paidAmount: Math.round(newPaidAmount),
+            paymentStatus: newStatus,
+            lastPaymentAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
       }
 
       // Update Payment Record

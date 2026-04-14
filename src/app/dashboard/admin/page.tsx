@@ -923,6 +923,7 @@ const AdminProjectTracker = ({ teamMembers, paymentRequests, allUsers = [] }: { 
     const handleUpdateField = async (id: string, field: string, value: any) => {
         try {
             const docRef = doc(db, "projectTracker", id);
+
             // Check if field is meant to be inside clientProject
             const nestedFields = [
                 "projectName", "clientName", "email", "contact",
@@ -931,15 +932,30 @@ const AdminProjectTracker = ({ teamMembers, paymentRequests, allUsers = [] }: { 
             ];
             const updateKey = nestedFields.includes(field) ? `clientProject.${field}` : field;
 
+            let updatePayload: any = { [updateKey]: value };
+
+            // Automatic status recalculation when amounts change
+            if (field === "totalAmount" || field === "receivedAmount") {
+                const project = projects.find(p => p.id === id);
+                if (project) {
+                    const total = field === "totalAmount" ? parseFloat(value) : parseFloat(project.clientProject?.totalAmount || project.totalAmount || 0);
+                    const received = field === "receivedAmount" ? parseFloat(value) : parseFloat(project.clientProject?.receivedAmount || project.paidAmount || 0);
+
+                    let newStatus = "pending";
+                    if (received >= total && total > 0) newStatus = "paid";
+                    else if (received > 0) newStatus = "partial";
+
+                    updatePayload["clientProject.paymentStatus"] = newStatus;
+                    updatePayload["paymentStatus"] = newStatus;
+                }
+            }
+
             // Special handling for legacy paymentStatus (root vs nested)
             if (field === "paymentStatus") {
-                await updateDoc(docRef, {
-                    [updateKey]: value,
-                    paymentStatus: value // Update root for backward compatibility
-                });
-            } else {
-                await updateDoc(docRef, { [updateKey]: value });
+                updatePayload["paymentStatus"] = value;
             }
+
+            await updateDoc(docRef, updatePayload);
         } catch (error) {
             console.error("Update error:", error);
         }
@@ -1277,7 +1293,7 @@ const AdminProjectTracker = ({ teamMembers, paymentRequests, allUsers = [] }: { 
                                 </td>
                                 <td className="p-3 text-xs font-black text-green-600">₹{p.clientProject?.receivedAmount || p.paidAmount || 0}</td>
                                 <td className="p-3">
-                                    <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tight ${p.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' :
+                                    <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tight ${(p.paymentStatus === 'paid' || p.paymentStatus === 'completed') ? 'bg-green-100 text-green-700' :
                                         (p.paymentStatus === 'partial' || p.paymentStatus === 'partial_paid') ? 'bg-blue-100 text-blue-700' :
                                             'bg-yellow-100 text-yellow-700'
                                         }`}>
@@ -2149,6 +2165,9 @@ const FinanceSection = ({ assignedProjects, totalRevenue, isSuperAdmin, user }: 
 
     const overallProfit = totalRevenue - totalInvestment;
     const isProfit = overallProfit >= 0;
+    const profitMargin = totalInvestment > 0 ? (overallProfit / totalInvestment) * 100 : 0;
+    const revenuePercent = totalInvestment > 0 ? (totalRevenue / totalInvestment) * 100 : 0;
+
     const formattedProfit = new Intl.NumberFormat('en-IN', {
         style: 'currency',
         currency: 'INR',
@@ -2198,7 +2217,7 @@ const FinanceSection = ({ assignedProjects, totalRevenue, isSuperAdmin, user }: 
                             {isProfit ? <TrendingUp size={28} /> : <TrendingDown size={28} />}
                         </div>
                         <div className="relative z-10">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Overall Profit</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Overall {isProfit ? 'Profit' : 'Loss'}</p>
                             <h3 className={`text-3xl font-black ${isProfit ? 'text-green-600' : 'text-red-600'}`}>
                                 {isProfit ? '+' : '-'}{formattedProfit}
                             </h3>
@@ -2233,20 +2252,14 @@ const FinanceSection = ({ assignedProjects, totalRevenue, isSuperAdmin, user }: 
                                 strokeWidth="12"
                                 fill="transparent"
                                 strokeDasharray={2 * Math.PI * 88}
-                                strokeDashoffset={2 * Math.PI * 88 * (1 - Math.min(Math.abs(isProfit
-                                    ? (totalRevenue > 0 ? overallProfit / totalRevenue : 0)
-                                    : (totalInvestment > 0 ? overallProfit / totalInvestment : 0)
-                                ), 1))}
+                                strokeDashoffset={2 * Math.PI * 88 * (1 - Math.min(Math.abs(profitMargin) / 100, 1))}
                                 strokeLinecap="round"
                                 className={`${isProfit ? 'text-green-500' : 'text-red-500'} transition-all duration-1000 ease-out`}
                             />
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                             <span className={`text-2xl font-black ${isProfit ? 'text-green-600' : 'text-red-600'}`}>
-                                {(Math.abs(isProfit
-                                    ? (totalRevenue > 0 ? overallProfit / totalRevenue : 0)
-                                    : (totalInvestment > 0 ? overallProfit / totalInvestment : 0)
-                                ) * 100).toFixed(1)}%
+                                {profitMargin.toFixed(1)}%
                             </span>
                             <span className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">
                                 {isProfit ? 'Profit' : 'Loss'} Ratio
@@ -2278,10 +2291,13 @@ const FinanceSection = ({ assignedProjects, totalRevenue, isSuperAdmin, user }: 
                         <div className="space-y-2">
                             <div className="flex justify-between text-xs font-bold">
                                 <span className="text-slate-600">Total Revenue Generated</span>
-                                <span className="text-green-600">{formattedRevenue} (100%)</span>
+                                <span className="text-green-600">{formattedRevenue} ({revenuePercent.toFixed(2)}%)</span>
                             </div>
                             <div className="h-4 bg-slate-100 rounded-full overflow-hidden w-full">
-                                <div className="h-full bg-green-500 rounded-full w-full animate-in slide-in-from-left duration-1000"></div>
+                                <div
+                                    className="h-full bg-green-500 rounded-full animate-in slide-in-from-left duration-1000"
+                                    style={{ width: `${Math.min(revenuePercent / Math.max(revenuePercent, 100) * 100, 100)}%` }}
+                                ></div>
                             </div>
                         </div>
 
@@ -2290,13 +2306,13 @@ const FinanceSection = ({ assignedProjects, totalRevenue, isSuperAdmin, user }: 
                             <div className="flex justify-between text-xs font-bold">
                                 <span className="text-slate-600">Total Capital Invested</span>
                                 <span className="text-red-600">
-                                    {formattedInvestment} ({totalRevenue > 0 ? ((totalInvestment / totalRevenue) * 100).toFixed(1) : totalInvestment > 0 ? '100' : '0'}%)
+                                    {formattedInvestment} (100%)
                                 </span>
                             </div>
                             <div className="h-4 bg-slate-100 rounded-full overflow-hidden w-full">
                                 <div
                                     className="h-full bg-red-500 rounded-full transition-all duration-1000"
-                                    style={{ width: `${Math.min((totalRevenue > 0 ? (totalInvestment / totalRevenue) * 100 : (totalInvestment > 0 ? 100 : 0)), 100)}%` }}
+                                    style={{ width: `${Math.min(100 / Math.max(revenuePercent, 100) * 100, 100)}%` }}
                                 ></div>
                             </div>
                         </div>

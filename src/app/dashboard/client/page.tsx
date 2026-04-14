@@ -166,9 +166,10 @@ const handleRazorpayPayment = async (project: any, user: any, router: any, amoun
     }
     setLoading(true);
     try {
-        console.log(`[Payment Init] Project: ${project?.projectId || "N/A"}, Amount: ${amount}, Request: ${paymentRequestId || "N/A"}`);
+        const currentProjectId = project?.id || project?.trackerId || project?.projectId;
+        console.log(`[Payment Init] Project: ${currentProjectId || "N/A"}, Amount: ${amount}, Request: ${paymentRequestId || "N/A"}`);
 
-        if (!project?.projectId && !paymentRequestId) {
+        if (!currentProjectId && !paymentRequestId) {
             throw new Error("Project ID or Request ID is missing. Cannot proceed with payment.");
         }
         if (!amount || isNaN(amount) || amount <= 0) {
@@ -181,7 +182,7 @@ const handleRazorpayPayment = async (project: any, user: any, router: any, amoun
             body: JSON.stringify({
                 amount: amount,
                 userId: user.uid,
-                projectId: project?.projectId || null,
+                projectId: currentProjectId || null,
                 requestId: paymentRequestId || null
             }),
         });
@@ -220,7 +221,7 @@ const handleRazorpayPayment = async (project: any, user: any, router: any, amoun
                             razorpay_order_id: response.razorpay_order_id,
                             razorpay_signature: response.razorpay_signature,
                             userId: user.uid,
-                            projectId: project?.projectId || null,
+                            projectId: project?.id || project?.trackerId || project?.projectId || null,
                             requestId: paymentRequestId || null,
                             amount: amount
                         }),
@@ -290,7 +291,8 @@ const PaymentsSection = ({ projects, user, paymentRequests }: { projects: any[],
     const processPayment = (amount: number) => {
         if (!selectedProject) return;
         setShowModal(false);
-        setLoadingPaymentId(selectedProject.projectId);
+        const pid = selectedProject.id || selectedProject.trackerId || selectedProject.projectId;
+        setLoadingPaymentId(pid);
         handleRazorpayPayment(selectedProject, user, router, amount, (l) => {
             if (!l) setLoadingPaymentId(null);
         });
@@ -421,9 +423,9 @@ const PaymentsSection = ({ projects, user, paymentRequests }: { projects: any[],
                             <tbody className="divide-y divide-slate-50">
                                 {projects.map((p, i) => {
                                     const status = (p.clientProject?.paymentStatus || p.paymentStatus || "").toLowerCase();
-                                    const isPaid = status === 'paid';
-                                    const isPartial = status === 'partial';
-                                    const isPending = status === 'pending';
+                                    const isPaid = status === 'paid' || status === 'completed';
+                                    const isPartial = status === 'partial' || status === 'partial_paid';
+                                    const isPending = !isPaid && !isPartial;
 
                                     return (
                                         <tr key={i} className="hover:bg-slate-50/50 transition-colors">
@@ -708,12 +710,13 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
                                             </div>
                                         </td>
                                         <td className="p-4 text-center">
-                                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${
-                                                (proj.clientProject?.paymentStatus || proj.paymentStatus || "").toLowerCase() === 'paid' ? 'bg-green-100 text-green-700' :
-                                                (proj.clientProject?.paymentStatus || proj.paymentStatus || "").toLowerCase() === 'partial' ? 'bg-blue-100 text-blue-700' :
-                                                'bg-yellow-100 text-yellow-700'
-                                            }`}>
-                                                {proj.clientProject?.paymentStatus || proj.paymentStatus || 'Pending'}
+                                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${((proj.clientProject?.paymentStatus || proj.paymentStatus || "").toLowerCase() === 'paid' || (proj.clientProject?.paymentStatus || proj.paymentStatus || "").toLowerCase() === 'completed') ? 'bg-green-100 text-green-700' :
+                                                    ((proj.clientProject?.paymentStatus || proj.paymentStatus || "").toLowerCase() === 'partial' || (proj.clientProject?.paymentStatus || proj.paymentStatus || "").toLowerCase() === 'partial_paid') ? 'bg-blue-100 text-blue-700' :
+                                                        'bg-yellow-100 text-yellow-700'
+                                                }`}>
+                                                {((proj.clientProject?.paymentStatus || proj.paymentStatus || "").toLowerCase() === 'paid' || (proj.clientProject?.paymentStatus || proj.paymentStatus || "").toLowerCase() === 'completed') ? 'Paid' :
+                                                    ((proj.clientProject?.paymentStatus || proj.paymentStatus || "").toLowerCase() === 'partial' || (proj.clientProject?.paymentStatus || proj.paymentStatus || "").toLowerCase() === 'partial_paid') ? 'Partial' :
+                                                        'Pending'}
                                             </span>
                                         </td>
                                     </tr>
