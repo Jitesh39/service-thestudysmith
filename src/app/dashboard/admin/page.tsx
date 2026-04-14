@@ -20,7 +20,8 @@ import {
     getCountFromServer,
     getDoc,
     onSnapshot,
-    runTransaction
+    runTransaction,
+    arrayUnion
 } from "firebase/firestore";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -57,7 +58,8 @@ import {
     Pencil,
     FileText,
     Search,
-    ExternalLink
+    ExternalLink,
+    Check
 } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import BlogManagementSection from "@/components/BlogManagementSection";
@@ -89,6 +91,7 @@ const AdminOverview = ({
     activeProjects,
     pendingPayments,
     totalTickets,
+    totalRevenue = 0,
     teamMembers,
     allUsers = [],
     onAddMember,
@@ -100,6 +103,7 @@ const AdminOverview = ({
     activeProjects: number;
     pendingPayments: number;
     totalTickets: number;
+    totalRevenue: number;
     teamMembers: any[];
     allUsers?: any[];
     onAddMember: (member: any) => void;
@@ -858,15 +862,25 @@ const ProfileSection = ({ user, loading, teamMembers }: { user: any; loading: bo
     );
 };
 
-const AdminProjectTracker = ({ teamMembers, paymentRequests }: { teamMembers: any[], paymentRequests: any[] }) => {
+const AdminProjectTracker = ({ teamMembers, paymentRequests, allUsers = [] }: { teamMembers: any[], paymentRequests: any[], allUsers: any[] }) => {
     const [projects, setProjects] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isAdding, setIsAdding] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const [filterStatus, setFilterStatus] = useState("All");
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    const [selectedProjectForPayment, setSelectedProjectForPayment] = useState<any>(null);
+    const [paymentData, setPaymentData] = useState({
+        amount: 0,
+        method: "Cash",
+        note: ""
+    });
+
     const [newProject, setNewProject] = useState({
         projectName: "",
         email: "",
         clientName: "",
+        clientId: "",
         totalAmount: 0,
         projectStatus: "Pending",
         contactStatus: "Not Contacted",
@@ -881,21 +895,19 @@ const AdminProjectTracker = ({ teamMembers, paymentRequests }: { teamMembers: an
     });
 
     useEffect(() => {
-        const q = query(collection(db, "projects"));
+        const q = query(collection(db, "projectTracker"));
         const unsubscribeProjects = onSnapshot(q, (snapshot) => {
             const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
 
-            // Premium Sorting Logic: Descending Order (Newest First)
+            // Sorting by trackerId or projectId
             const sortedList = [...list].sort((a, b) => {
-                // Handle string vs number projectId conversion
-                const idA = parseInt(String(a.projectId || 0));
-                const idB = parseInt(String(b.projectId || 0));
+                const idA = parseInt(String(a.trackerId || a.projectId || 0));
+                const idB = parseInt(String(b.trackerId || b.projectId || 0));
 
                 if (idB !== idA) {
-                    return idB - idA; // Higher IDs first
+                    return idB - idA;
                 }
 
-                // Fallback to createdAt timestamp for identical/missing IDs
                 const timeA = a.createdAt?.seconds || 0;
                 const timeB = b.createdAt?.seconds || 0;
                 return timeB - timeA;
@@ -910,10 +922,74 @@ const AdminProjectTracker = ({ teamMembers, paymentRequests }: { teamMembers: an
 
     const handleUpdateField = async (id: string, field: string, value: any) => {
         try {
-            const docRef = doc(db, "projects", id);
-            await updateDoc(docRef, { [field]: value });
+            const docRef = doc(db, "projectTracker", id);
+            // Check if field is meant to be inside clientProject
+            const nestedFields = [
+                "projectName", "clientName", "email", "contact",
+                "status", "enquireDate", "targetDate", "assignedTo",
+                "totalAmount", "receivedAmount", "paymentStatus"
+            ];
+            const updateKey = nestedFields.includes(field) ? `clientProject.${field}` : field;
+
+            // Special handling for legacy paymentStatus (root vs nested)
+            if (field === "paymentStatus") {
+                await updateDoc(docRef, {
+                    [updateKey]: value,
+                    paymentStatus: value // Update root for backward compatibility
+                });
+            } else {
+                await updateDoc(docRef, { [updateKey]: value });
+            }
         } catch (error) {
             console.error("Update error:", error);
+        }
+    };
+
+    const handleUpdatePayment = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedProjectForPayment || paymentData.amount <= 0) return;
+
+        try {
+            const docRef = doc(db, "projectTracker", selectedProjectForPayment.id);
+            const currentReceived = parseFloat(selectedProjectForPayment.clientProject?.receivedAmount || selectedProjectForPayment.paidAmount || 0);
+            const totalAmount = parseFloat(selectedProjectForPayment.clientProject?.totalAmount || selectedProjectForPayment.totalAmount || 0);
+            const newReceived = currentReceived + parseFloat(paymentData.amount as any);
+
+            let newStatus = "pending";
+            if (newReceived >= totalAmount) newStatus = "paid";
+            else if (newReceived > 0) newStatus = "partial";
+
+            const historyEntry = {
+                amount: parseFloat(paymentData.amount as any),
+                method: paymentData.method,
+                note: paymentData.note,
+                date: new Date().toISOString(),
+                addedBy: "Admin"
+            };
+
+            await updateDoc(docRef, {
+                "clientProject.receivedAmount": newReceived,
+                "clientProject.paymentStatus": newStatus,
+                paymentStatus: newStatus, // Sync root for legacy
+                paidAmount: newReceived,   // Sync root for legacy
+                paymentHistory: arrayUnion(historyEntry)
+            });
+
+            setIsPaymentModalOpen(false);
+            setPaymentData({ amount: 0, method: "Cash", note: "" });
+            setSelectedProjectForPayment(null);
+        } catch (error) {
+            console.error("Payment update error:", error);
+            alert("Failed to update payment");
+        }
+    };
+
+    const handlePublishToggle = async (id: string, currentStatus: boolean) => {
+        try {
+            const docRef = doc(db, "projectTracker", id);
+            await updateDoc(docRef, { isPublished: !currentStatus });
+        } catch (error) {
+            console.error("Toggle publish error:", error);
         }
     };
 
@@ -921,69 +997,99 @@ const AdminProjectTracker = ({ teamMembers, paymentRequests }: { teamMembers: an
         e.preventDefault();
         try {
             // Validation
+            if (!newProject.clientId) {
+                alert("Please select a client before creating a project.");
+                return;
+            }
+
             if (newProject.url && !newProject.url.startsWith("https://")) {
                 alert("URL must include https:// (e.g. https://example.com)");
                 return;
             }
 
-            // 1. Get the current highest ID from the collection to be absolutely sure
-            const q = query(collection(db, "projects"), orderBy("projectId", "desc"), limit(1));
+            // 1. Fetch latest client data from Firestore using UID
+            const clientDoc = await getDoc(doc(db, "users", newProject.clientId));
+            if (!clientDoc.exists()) {
+                alert("Selected client does not exist in Firestore.");
+                return;
+            }
+            const clientData = clientDoc.data();
+            const clientEmail = clientData.email;
+            const clientName = clientData.displayName || clientData.name || "Unknown";
+
+            // 2. Get the current highest ID from the collection
+            const q = query(collection(db, "projectTracker"), orderBy("trackerId", "desc"), limit(1));
             const snap = await getDocs(q);
             let highestExisting = 1000;
             if (!snap.empty) {
-                highestExisting = Number(snap.docs[0].data().projectId) || 1000;
+                highestExisting = Number(snap.docs[0].data().trackerId || snap.docs[0].data().projectId) || 1000;
             }
 
-            await runTransaction(db, async (transaction) => {
-                const counterRef = doc(db, "counters", "projectId");
-                const counterDoc = await transaction.get(counterRef);
+            const counterRef = doc(db, "counters", "projectId");
+            const counterDoc = await getDoc(counterRef);
+            let counterId = 1000;
+            if (counterDoc.exists()) {
+                counterId = Number(counterDoc.data().current) || 1000;
+            }
 
-                let counterId = 1000;
-                if (counterDoc.exists()) {
-                    counterId = Number(counterDoc.data().current) || 1000;
-                }
+            const nextId = Math.max(highestExisting, counterId) + 1;
 
-                // Use the maximum of queried ID and counter to prevent duplicates
-                const nextId = Math.max(highestExisting, counterId) + 1;
-                const projectDocId = nextId.toString();
-                const projectRef = doc(db, "projects", projectDocId);
-
-                // Double check if this doc accidentally exists
-                const existingDoc = await transaction.get(projectRef);
-                if (existingDoc.exists()) {
-                    throw new Error("Duplicate ID detected during transaction.");
-                }
-
-                transaction.set(projectRef, {
-                    ...newProject,
-                    projectId: nextId,
-                    paidAmount: 0,
-                    paymentStatus: "pending",
-                    createdAt: serverTimestamp(),
-                });
-
-                transaction.set(counterRef, { current: nextId }, { merge: true });
+            // 3. Store project document with root-level clientId and clientEmail in projectTracker
+            await addDoc(collection(db, "projectTracker"), {
+                trackerId: nextId.toString(),
+                clientId: newProject.clientId,
+                clientEmail: clientEmail,
+                isPublished: false,
+                clientProject: {
+                    projectName: newProject.projectName,
+                    clientName: clientName,
+                    email: clientEmail,
+                    contact: newProject.contactStatus,
+                    status: newProject.projectStatus,
+                    enquireDate: newProject.enquireDate,
+                    targetDate: newProject.targetDate,
+                    assignedTo: newProject.assignedTo,
+                    totalAmount: newProject.totalAmount,
+                    receivedAmount: 0
+                },
+                paymentStatus: "pending",
+                deploymentStatus: newProject.deploymentStatus,
+                domain: newProject.domain,
+                domainPlan: newProject.domainPlan,
+                url: newProject.url,
+                registrar: newProject.registrar,
+                createdAt: serverTimestamp(),
             });
+
+            await updateDoc(counterRef, { current: nextId });
 
             setIsAdding(false);
             setNewProject({
-                projectName: "", email: "", clientName: "", totalAmount: 0,
+                projectName: "", email: "", clientName: "", clientId: "", totalAmount: 0,
                 projectStatus: "Pending", contactStatus: "Not Contacted", enquireDate: new Date().toISOString().split('T')[0],
                 targetDate: "N/A", assignedTo: "Unassigned", deploymentStatus: "Pending",
                 domain: "", domainPlan: "", url: "", registrar: ""
             });
+
+            console.log("[Project Trace] Created successfully. clientId:", newProject.clientId);
         } catch (error: any) {
             console.error("Add error:", error);
             alert("Failed to add project: " + error.message);
         }
     };
 
-    const filteredProjects = projects.filter(p =>
-        String(p.projectId || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        String(p.projectName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        String(p.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        String(p.clientName || "").toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredProjects = projects.filter(p => {
+        const matchesSearch = String(p.trackerId || p.projectId || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+            String(p.clientProject?.projectName || p.projectName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+            String(p.clientProject?.email || p.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+            String(p.clientProject?.clientName || p.clientName || "").toLowerCase().includes(searchTerm.toLowerCase());
+
+        let matchesFilter = true;
+        if (filterStatus === "Published") matchesFilter = p.isPublished === true;
+        if (filterStatus === "Unpublished") matchesFilter = p.isPublished !== true;
+
+        return matchesSearch && matchesFilter;
+    });
 
     return (
         <div className="space-y-6">
@@ -1003,6 +1109,15 @@ const AdminProjectTracker = ({ teamMembers, paymentRequests }: { teamMembers: an
                             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                         />
                     </div>
+                    <select
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                        className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none w-full sm:w-auto"
+                    >
+                        <option value="All">All Projects</option>
+                        <option value="Published">Published</option>
+                        <option value="Unpublished">Unpublished</option>
+                    </select>
                     <button
                         onClick={() => setIsAdding(true)}
                         className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-100 transition-all active:scale-95 flex items-center justify-center gap-2 w-full sm:w-auto"
@@ -1020,17 +1135,41 @@ const AdminProjectTracker = ({ teamMembers, paymentRequests }: { teamMembers: an
                             <button onClick={() => setIsAdding(false)} className="text-slate-400 hover:text-slate-900"><X size={24} /></button>
                         </div>
                         <form onSubmit={handleAddProject} className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1 col-span-2">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Link to Client / User</label>
+                                <select
+                                    required
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={newProject.clientId}
+                                    onChange={(e) => {
+                                        const selected = allUsers.find(u => u.uid === e.target.value);
+                                        if (selected) {
+                                            setNewProject({
+                                                ...newProject,
+                                                clientId: selected.uid,
+                                                clientName: selected.displayName || selected.name || "Unknown",
+                                                email: selected.email
+                                            });
+                                        }
+                                    }}
+                                >
+                                    <option value="">-- Select Client --</option>
+                                    {allUsers.map(u => (
+                                        <option key={u.uid} value={u.uid}>{u.displayName || u.name} ({u.email})</option>
+                                    ))}
+                                </select>
+                            </div>
                             <div className="space-y-1">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Project Name</label>
                                 <input required type="text" value={newProject.projectName} onChange={(e) => setNewProject({ ...newProject, projectName: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. Portfolio Website" />
                             </div>
                             <div className="space-y-1">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Client Email</label>
-                                <input required type="email" value={newProject.email} onChange={(e) => setNewProject({ ...newProject, email: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="client@example.com" />
+                                <input required type="email" value={newProject.email} readOnly className="w-full bg-slate-100 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none cursor-not-allowed" placeholder="client@example.com" />
                             </div>
                             <div className="space-y-1">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Client Name</label>
-                                <input required type="text" value={newProject.clientName} onChange={(e) => setNewProject({ ...newProject, clientName: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. John Doe" />
+                                <input required type="text" value={newProject.clientName} readOnly className="w-full bg-slate-100 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none cursor-not-allowed" placeholder="e.g. John Doe" />
                             </div>
                             <div className="space-y-1">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Total Amount (₹)</label>
@@ -1061,6 +1200,7 @@ const AdminProjectTracker = ({ teamMembers, paymentRequests }: { teamMembers: an
                     <thead className="bg-slate-900 border-b border-slate-800">
                         <tr className="whitespace-nowrap">
                             <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-900 z-10 border-r border-slate-800 shadow-[2px_0_5px_rgba(0,0,0,0.1)]">Project ID</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Publish Status</th>
                             <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Project Name</th>
                             <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Client Name</th>
                             <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Email</th>
@@ -1082,21 +1222,31 @@ const AdminProjectTracker = ({ teamMembers, paymentRequests }: { teamMembers: an
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {loading ? (
-                            <tr><td colSpan={15} className="p-20 text-center text-slate-400 font-bold">Loading Project Data...</td></tr>
+                            <tr><td colSpan={19} className="p-20 text-center text-slate-400 font-bold">Loading Project Data...</td></tr>
+                        ) : filteredProjects.length === 0 ? (
+                            <tr><td colSpan={19} className="p-20 text-center text-slate-400 font-bold">No projects found.</td></tr>
                         ) : filteredProjects.map(p => (
                             <tr key={p.id} className="hover:bg-blue-50/30 transition-colors group whitespace-nowrap">
-                                <td className="p-3 font-mono text-[11px] font-bold text-blue-600 sticky left-0 bg-white group-hover:bg-blue-50/30 z-10 border-r border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">{p.projectId}</td>
-                                <td className="p-3">
-                                    <input className="bg-transparent focus:bg-white focus:ring-1 focus:ring-blue-400 outline-none p-1 rounded w-full text-xs font-medium" defaultValue={p.projectName} onBlur={(e) => handleUpdateField(p.id, "projectName", e.target.value)} />
+                                <td className="p-3 font-mono text-[11px] font-bold text-blue-600 sticky left-0 bg-white group-hover:bg-blue-50/30 z-10 border-r border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">{p.trackerId || p.projectId}</td>
+                                <td className="p-3 text-center">
+                                    <button
+                                        onClick={() => handlePublishToggle(p.id, p.isPublished)}
+                                        className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all shadow-sm ${p.isPublished ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-100 text-red-700 hover:bg-red-200'}`}
+                                    >
+                                        {p.isPublished ? 'Published ✅' : 'Not Published ❌'}
+                                    </button>
                                 </td>
                                 <td className="p-3">
-                                    <input className="bg-transparent focus:bg-white focus:ring-1 focus:ring-blue-400 outline-none p-1 rounded w-full text-xs font-medium" defaultValue={p.clientName} onBlur={(e) => handleUpdateField(p.id, "clientName", e.target.value)} />
+                                    <input className="bg-transparent focus:bg-white focus:ring-1 focus:ring-blue-400 outline-none p-1 rounded w-full text-xs font-medium" defaultValue={p.clientProject?.projectName || p.projectName} onBlur={(e) => handleUpdateField(p.id, "projectName", e.target.value)} />
+                                </td>
+                                <td className="p-3">
+                                    <input className="bg-transparent focus:bg-white focus:ring-1 focus:ring-blue-400 outline-none p-1 rounded w-full text-xs font-medium" defaultValue={p.clientProject?.clientName || p.clientName} onBlur={(e) => handleUpdateField(p.id, "clientName", e.target.value)} />
                                 </td>
                                 <td className="p-3 text-[11px] font-medium text-slate-500">
-                                    <input className="bg-transparent focus:bg-white focus:ring-1 focus:ring-blue-400 outline-none p-1 rounded w-full text-xs font-medium" defaultValue={p.email} onBlur={(e) => handleUpdateField(p.id, "email", e.target.value)} />
+                                    <input className="bg-transparent focus:bg-white focus:ring-1 focus:ring-blue-400 outline-none p-1 rounded w-full text-xs font-medium" defaultValue={p.clientProject?.email || p.email} onBlur={(e) => handleUpdateField(p.id, "email", e.target.value)} />
                                 </td>
                                 <td className="p-3">
-                                    <select className="bg-transparent outline-none text-xs font-bold" defaultValue={p.projectStatus} onChange={(e) => handleUpdateField(p.id, "projectStatus", e.target.value)}>
+                                    <select className="bg-transparent outline-none text-xs font-bold" defaultValue={p.clientProject?.status || p.projectStatus} onChange={(e) => handleUpdateField(p.id, "status", e.target.value)}>
                                         <option value="Pending">Pending</option>
                                         <option value="In Progress">In Progress</option>
                                         <option value="Completed">Completed</option>
@@ -1104,28 +1254,28 @@ const AdminProjectTracker = ({ teamMembers, paymentRequests }: { teamMembers: an
                                     </select>
                                 </td>
                                 <td className="p-3">
-                                    <select className="bg-transparent outline-none text-xs font-bold" defaultValue={p.contactStatus} onChange={(e) => handleUpdateField(p.id, "contactStatus", e.target.value)}>
+                                    <select className="bg-transparent outline-none text-xs font-bold" defaultValue={p.clientProject?.contact || p.contactStatus} onChange={(e) => handleUpdateField(p.id, "contact", e.target.value)}>
                                         <option value="Not Contacted">Not Contacted</option>
                                         <option value="In Discussion">In Discussion</option>
                                         <option value="Contacted">Contacted</option>
                                     </select>
                                 </td>
                                 <td className="p-3">
-                                    <input type="date" className="bg-transparent outline-none text-[11px] font-bold text-slate-500" defaultValue={p.enquireDate} onChange={(e) => handleUpdateField(p.id, "enquireDate", e.target.value)} />
+                                    <input type="date" className="bg-transparent outline-none text-[11px] font-bold text-slate-500" defaultValue={p.clientProject?.enquireDate || p.enquireDate} onChange={(e) => handleUpdateField(p.id, "enquireDate", e.target.value)} />
                                 </td>
                                 <td className="p-3">
-                                    <input type="date" className="bg-transparent outline-none text-[11px] font-bold text-slate-500" defaultValue={p.targetDate === "N/A" ? "" : p.targetDate} onChange={(e) => handleUpdateField(p.id, "targetDate", e.target.value)} />
+                                    <input type="date" className="bg-transparent outline-none text-[11px] font-bold text-slate-500" defaultValue={p.clientProject?.targetDate !== "N/A" ? (p.clientProject?.targetDate || p.targetDate) : ""} onChange={(e) => handleUpdateField(p.id, "targetDate", e.target.value || "N/A")} />
                                 </td>
                                 <td className="p-3">
-                                    <select className="bg-transparent outline-none text-xs font-bold" defaultValue={p.assignedTo} onChange={(e) => handleUpdateField(p.id, "assignedTo", e.target.value)}>
+                                    <select className="bg-transparent outline-none text-xs font-bold" defaultValue={p.clientProject?.assignedTo || p.assignedTo} onChange={(e) => handleUpdateField(p.id, "assignedTo", e.target.value)}>
                                         <option value="Unassigned">Unassigned</option>
-                                        {teamMembers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                                        {teamMembers.map((m: any) => <option key={m.id} value={m.name}>{m.name}</option>)}
                                     </select>
                                 </td>
                                 <td className="p-3">
-                                    <input type="number" className="bg-transparent focus:bg-white focus:ring-1 focus:ring-blue-400 outline-none p-1 rounded w-24 text-xs font-bold" defaultValue={p.totalAmount} onBlur={(e) => handleUpdateField(p.id, "totalAmount", parseFloat(e.target.value) || 0)} />
+                                    <input type="number" className="bg-transparent focus:bg-white focus:ring-1 focus:ring-blue-400 outline-none p-1 rounded w-24 text-xs font-bold" defaultValue={p.clientProject?.totalAmount || p.totalAmount} onBlur={(e) => handleUpdateField(p.id, "totalAmount", parseFloat(e.target.value) || 0)} />
                                 </td>
-                                <td className="p-3 text-xs font-black text-green-600">₹{p.paidAmount || 0}</td>
+                                <td className="p-3 text-xs font-black text-green-600">₹{p.clientProject?.receivedAmount || p.paidAmount || 0}</td>
                                 <td className="p-3">
                                     <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tight ${p.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' :
                                         (p.paymentStatus === 'partial' || p.paymentStatus === 'partial_paid') ? 'bg-blue-100 text-blue-700' :
@@ -1154,25 +1304,108 @@ const AdminProjectTracker = ({ teamMembers, paymentRequests }: { teamMembers: an
                                     <input className="bg-transparent focus:bg-white focus:ring-1 focus:ring-blue-400 outline-none p-1 rounded w-full text-xs" defaultValue={p.registrar} onBlur={(e) => handleUpdateField(p.id, "registrar", e.target.value)} />
                                 </td>
                                 <td className="p-3 text-center">
-                                    <button
-                                        onClick={async () => {
-                                            if (window.confirm(`Delete project ${p.projectId}?`)) {
-                                                try {
-                                                    await deleteDoc(doc(db, "projects", p.id));
-                                                } catch (e) { console.error(e); }
-                                            }
-                                        }}
-                                        className="text-slate-300 hover:text-red-500 transition-colors"
-                                        title="Delete Project"
-                                    >
-                                        <X size={16} />
-                                    </button>
+                                    <div className="flex items-center justify-center gap-2">
+                                        <button
+                                            onClick={() => {
+                                                setSelectedProjectForPayment(p);
+                                                setIsPaymentModalOpen(true);
+                                            }}
+                                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                            title="Update Payment"
+                                        >
+                                            <CreditCard size={16} />
+                                        </button>
+                                        <button
+                                            onClick={async () => {
+                                                if (window.confirm(`Delete project ${p.trackerId || p.projectId}?`)) {
+                                                    try {
+                                                        await deleteDoc(doc(db, "projectTracker", p.id));
+                                                    } catch (e) { console.error(e); }
+                                                }
+                                            }}
+                                            className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"
+                                            title="Delete Project"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
             </div>
+
+            {/* Manual Payment Modal */}
+            {isPaymentModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-8 space-y-6">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h3 className="text-2xl font-black text-slate-900">Update <span className="text-blue-600">Payment</span></h3>
+                                <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">{selectedProjectForPayment?.clientProject?.projectName || selectedProjectForPayment?.projectName}</p>
+                            </div>
+                            <button onClick={() => setIsPaymentModalOpen(false)} className="text-slate-400 hover:text-slate-900"><X size={24} /></button>
+                        </div>
+
+                        <form onSubmit={handleUpdatePayment} className="space-y-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Amount (₹)</label>
+                                <input
+                                    required
+                                    type="number"
+                                    placeholder="Enter received amount"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500"
+                                    value={paymentData.amount}
+                                    onChange={e => setPaymentData({ ...paymentData, amount: parseFloat(e.target.value) || 0 })}
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Payment Method</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {["Cash", "Online"].map(m => (
+                                        <button
+                                            key={m}
+                                            type="button"
+                                            onClick={() => setPaymentData({ ...paymentData, method: m })}
+                                            className={`py-3 rounded-xl text-sm font-bold border-2 transition-all ${paymentData.method === m ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                                        >
+                                            {m}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Note (Optional)</label>
+                                <textarea
+                                    rows={2}
+                                    placeholder="Add payment remark..."
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm resize-none focus:ring-2 focus:ring-blue-500"
+                                    value={paymentData.note}
+                                    onChange={e => setPaymentData({ ...paymentData, note: e.target.value })}
+                                />
+                            </div>
+
+                            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                <div className="flex justify-between text-xs mb-1">
+                                    <span className="text-blue-900 font-bold">New Balance:</span>
+                                    <span className="text-blue-700 font-black">₹{(parseFloat(selectedProjectForPayment?.clientProject?.receivedAmount || selectedProjectForPayment?.paidAmount || 0) + paymentData.amount).toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between text-xs font-black">
+                                    <span className="text-blue-900">Total Due:</span>
+                                    <span className="text-slate-900">₹{(selectedProjectForPayment?.clientProject?.totalAmount || selectedProjectForPayment?.totalAmount || 0).toLocaleString()}</span>
+                                </div>
+                            </div>
+
+                            <button type="submit" className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
+                                <Check size={18} /> Confirm Payment
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -1497,7 +1730,7 @@ const AdminPaymentsSection = ({ projects, paymentRequests, allUsers, user }: { p
                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700"
                                 >
                                     <option value="">No specific project (General Payment)</option>
-                                    {[...new Set(projects.map(p => p.projectId || p.id))].sort().map(pid => (
+                                    {[...new Set(projects.map(p => p.trackerId || p.projectId || p.id))].sort().map(pid => (
                                         <option key={pid} value={pid}>Project ID: {pid}</option>
                                     ))}
                                 </select>
@@ -1556,7 +1789,7 @@ const AdminPaymentsSection = ({ projects, paymentRequests, allUsers, user }: { p
 
                                     return (
                                         <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="p-5 font-mono text-sm font-bold text-blue-600">{p.projectId || p.id}</td>
+                                            <td className="p-5 font-mono text-sm font-bold text-blue-600">{p.trackerId || p.projectId || p.id}</td>
                                             <td className="p-5">
                                                 <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${isPaid ? 'bg-green-100 text-green-700' :
                                                     isHalf ? 'bg-blue-100 text-blue-700' :
@@ -1594,8 +1827,7 @@ const AdminPaymentsSection = ({ projects, paymentRequests, allUsers, user }: { p
 
 const AssignedProjectsSection = ({ projects, users, onDelete, isSuperAdmin }: { projects: any[], users: any[], onDelete: (uid: string, pid: string) => void, isSuperAdmin: boolean }) => {
     const totalDelivered = projects.filter(p =>
-        (p.projectStatus || p.status || "").toLowerCase() === "completed" ||
-        (p.projectStatus || p.status || "").toLowerCase() === "complete"
+        (p.clientProject?.status || p.projectStatus || p.status || "").toLowerCase().includes("completed")
     ).length;
 
     const activeCount = projects.length - totalDelivered;
@@ -1631,58 +1863,63 @@ const AssignedProjectsSection = ({ projects, users, onDelete, isSuperAdmin }: { 
                 </div>
 
                 <div className="overflow-x-auto animate-in slide-in-from-top-2 duration-300 scrollbar-thin scrollbar-thumb-slate-200">
-                    <table className="w-full text-left min-w-[600px] md:min-w-full">
+                    <table className="w-full text-left min-w-[800px] md:min-w-full">
                         <thead className="bg-slate-50/50 border-b border-slate-100">
                             <tr>
                                 <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">ID</th>
                                 <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Project</th>
-                                <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Client</th>
-                                <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Enquired Date</th>
-                                <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Target Date</th>
-                                <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
+                                <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Client Details</th>
+                                <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Enquired</th>
+                                <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Deadline</th>
+                                <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Progress</th>
                                 {isSuperAdmin && <th className="p-3 md:p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Action</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                             {projects.length > 0 ? (
                                 projects.map((proj, i) => {
-                                    const client = users.find(u => u.uid === proj.uid);
+                                    const clientDoc = users.find(u => u.uid === proj.clientId);
+                                    const projectName = proj.clientProject?.projectName || proj.projectName || "No Title Set";
+                                    const clientName = proj.clientProject?.clientName || clientDoc?.displayName || "Unknown";
+                                    const clientEmail = proj.clientEmail || proj.email || clientDoc?.email || "No Email";
+                                    const status = proj.clientProject?.status || proj.projectStatus || proj.status || "Pending";
+
                                     return (
                                         <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
                                             <td className="p-3 md:p-4">
                                                 <span className="font-mono text-[10px] md:text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                                                    {proj.projectId || proj.docId || "N/A"}
+                                                    {proj.trackerId || proj.projectId || "T-00"}
                                                 </span>
                                             </td>
                                             <td className="p-3 md:p-4">
-                                                <p className="font-bold text-slate-700 text-xs md:text-sm">{proj.projectName || "No Title Set"}</p>
+                                                <p className="font-black text-slate-700 text-xs md:text-sm">{projectName}</p>
                                             </td>
                                             <td className="p-3 md:p-4">
                                                 <div className="space-y-0.5">
-                                                    <p className="text-[10px] md:text-xs font-bold text-slate-700">{client?.displayName || "Unknown"}</p>
-                                                    <p className="text-[10px] text-slate-400 font-medium italic truncate max-w-[120px] md:max-w-none">{client?.email || "No Email"}</p>
+                                                    <p className="text-[10px] md:text-xs font-bold text-slate-700">{clientName}</p>
+                                                    <p className="text-[10px] text-slate-400 font-medium italic truncate max-w-[150px]">{clientEmail}</p>
                                                 </div>
                                             </td>
                                             <td className="p-3 md:p-4 text-center">
-                                                <p className="text-[10px] font-bold text-slate-600 bg-slate-50 px-2 py-1 rounded border border-slate-100">{formatDate(proj.enquireDate || proj.date)}</p>
+                                                <p className="text-[10px] font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100 inline-block">{formatDate(proj.clientProject?.enquireDate || proj.enquireDate || proj.date)}</p>
                                             </td>
                                             <td className="p-3 md:p-4 text-center">
-                                                <p className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100">{formatDate(proj.targetDate)}</p>
+                                                <p className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100 inline-block">{formatDate(proj.clientProject?.targetDate || proj.targetDate)}</p>
                                             </td>
                                             <td className="p-3 md:p-4 text-center">
-                                                <span className={`px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[9px] md:text-[10px] font-bold uppercase tracking-widest border ${(proj.projectStatus || proj.status)?.toLowerCase() === 'completed'
-                                                    ? 'bg-green-50 text-green-700 border-green-100'
-                                                    : 'bg-blue-50 text-blue-700 border-blue-100'
+                                                <span className={`px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest border ${status.toLowerCase().includes('completed')
+                                                    ? 'bg-green-100 text-green-700 border-green-200'
+                                                    : status.toLowerCase().includes('progress') ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200'
                                                     }`}>
-                                                    {proj.projectStatus || proj.status || "Active"}
+                                                    {status}
                                                 </span>
                                             </td>
                                             {isSuperAdmin && (
                                                 <td className="p-3 md:p-4 text-right">
                                                     <button
                                                         onClick={() => {
-                                                            if (confirm(`Remove project ID ${proj.projectId || proj.docId}?`)) {
-                                                                onDelete(proj.uid, proj.docId);
+                                                            if (confirm(`Remove project ID ${proj.trackerId || proj.projectId}?`)) {
+                                                                onDelete(proj.clientId, proj.id);
                                                             }
                                                         }}
                                                         className="p-1.5 md:p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
@@ -1835,7 +2072,7 @@ const UsersSection = ({ users, totalUsers, onDelete, currentUserEmail }: { users
     );
 };
 
-const FinanceSection = ({ assignedProjects, isSuperAdmin, user }: { assignedProjects: any[], isSuperAdmin: boolean, user: any }) => {
+const FinanceSection = ({ assignedProjects, totalRevenue, isSuperAdmin, user }: { assignedProjects: any[], totalRevenue: number, isSuperAdmin: boolean, user: any }) => {
     const [totalInvestment, setTotalInvestment] = useState(0);
     const [investments, setInvestments] = useState<any[]>([]);
     const [amount, setAmount] = useState("");
@@ -1844,17 +2081,6 @@ const FinanceSection = ({ assignedProjects, isSuperAdmin, user }: { assignedProj
     const [isAdding, setIsAdding] = useState(false);
     const [loading, setLoading] = useState(false);
     const [expandedIds, setExpandedIds] = useState<string[]>([]);
-
-    // Calculate Revenue
-    const totalRevenue = assignedProjects.reduce((acc, curr) => {
-        const status = (curr.paymentStatus || "").toLowerCase();
-        if (status === 'paid' || status === 'full paid' || status === 'cleared') {
-            const amountStr = (curr.payment || "0").toString().replace(/[^0-9.]/g, '');
-            const amount = parseFloat(amountStr) || 0;
-            return acc + amount;
-        }
-        return acc;
-    }, 0);
 
     const formattedRevenue = new Intl.NumberFormat('en-IN', {
         style: 'currency',
@@ -2245,6 +2471,7 @@ const ProjectPublishSection = () => {
 
     const [formData, setFormData] = useState({
         title: "",
+        category: "Web Development",
         description: "",
         url: "",
         image: null as File | null,
@@ -2295,26 +2522,28 @@ const ProjectPublishSection = () => {
                 imageUrl = await CloudinaryUpload(formData.image);
             }
 
+            const projectData = {
+                title: formData.title,
+                category: formData.category,
+                description: formData.description,
+                url: formData.url,
+                image: imageUrl,
+                isPublished: true,
+                updatedAt: serverTimestamp(),
+            };
+
             if (editId) {
-                await updateDoc(doc(db, "projects", editId), {
-                    title: formData.title,
-                    description: formData.description,
-                    url: formData.url,
-                    image: imageUrl,
-                    updatedAt: serverTimestamp(),
-                });
+                await updateDoc(doc(db, "projects", editId), projectData);
                 showToast("Project updated successfully!", "success");
             } else {
                 await addDoc(collection(db, "projects"), {
-                    title: formData.title,
-                    description: formData.description,
-                    url: formData.url,
-                    image: imageUrl,
+                    ...projectData,
+                    projectId: `DEMO-${Date.now()}`,
                     createdAt: serverTimestamp(),
                 });
                 showToast("Project published successfully!", "success");
             }
-            setFormData({ title: "", description: "", url: "", image: null, preview: "" });
+            setFormData({ title: "", category: "Web Development", description: "", url: "", image: null, preview: "" });
             setIsFormOpen(false);
             setEditId(null);
             fetchProjects();
@@ -2327,11 +2556,12 @@ const ProjectPublishSection = () => {
 
     const handleEdit = (proj: any) => {
         setFormData({
-            title: proj.title,
-            description: proj.description,
-            url: proj.url,
+            title: proj.title || proj.clientProject?.projectName || "",
+            category: proj.category || proj.clientProject?.category || "Web Development",
+            description: proj.description || proj.clientProject?.description || "",
+            url: proj.url || proj.clientProject?.url || "",
             image: null,
-            preview: proj.image
+            preview: proj.image || proj.clientProject?.image
         });
         setEditId(proj.id);
         setIsFormOpen(true);
@@ -2369,7 +2599,7 @@ const ProjectPublishSection = () => {
                         onClick={() => {
                             if (isFormOpen && editId) {
                                 setEditId(null);
-                                setFormData({ title: "", description: "", url: "", image: null, preview: "" });
+                                setFormData({ title: "", category: "Web Development", description: "", url: "", image: null, preview: "" });
                             } else {
                                 setIsFormOpen(!isFormOpen);
                             }
@@ -2394,6 +2624,17 @@ const ProjectPublishSection = () => {
                                         onChange={e => setFormData({ ...formData, title: e.target.value })}
                                         className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-600"
                                         placeholder="Enter project title..."
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block ml-1">Category</label>
+                                    <input
+                                        required
+                                        type="text"
+                                        value={formData.category}
+                                        onChange={e => setFormData({ ...formData, category: e.target.value })}
+                                        className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-600"
+                                        placeholder="e.g. Web Development, AI, Portfolio..."
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -3100,6 +3341,7 @@ export default function AdminDashboard() {
 
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
     const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
+    const [totalRevenue, setTotalRevenue] = useState(0);
 
     useEffect(() => {
         const reqQ = query(collection(db, "paymentRequests"), orderBy("createdAt", "desc"));
@@ -3185,16 +3427,29 @@ export default function AdminDashboard() {
             const openTicketsSnap = await getCountFromServer(openTicketsQuery);
             setTotalTickets(openTicketsSnap.data().count);
 
-            // 4. Fetch Summary Stats and Global Projects
-            const projectsSnapshot = await getDocs(collection(db, "projects"));
-            const projectsList = projectsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+            // 4. Fetch Summary Stats and Client Tracker Projects
+            const trackerSnapshot = await getDocs(collection(db, "projectTracker"));
+            const trackerList = trackerSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
 
-            const activeCount = projectsList.filter((p: any) => p.projectStatus !== "Completed").length;
-            const pendingCount = projectsList.filter((p: any) => p.paymentStatus === "pending" || p.paymentStatus === "partial").length;
+            const activeCount = trackerList.filter((p: any) => (p.clientProject?.status || p.projectStatus) !== "Completed").length;
+            const pendingCount = trackerList.filter((p: any) => p.paymentStatus === "pending" || p.paymentStatus === "partial").length;
 
             setActiveProjects(activeCount);
             setPendingPayments(pendingCount);
-            setGlobalProjects(projectsList);
+            setGlobalProjects(trackerList);
+
+            // 5. Financial Calculations from Tracker (Real-time Revenue)
+            let revenue = 0;
+            trackerList.forEach((p: any) => {
+                revenue += parseFloat(p.clientProject?.receivedAmount || p.paidAmount || 0);
+            });
+            setTotalRevenue(revenue);
+
+            // Fetch Demo Projects for stats or display if needed
+            const demoSnapshot = await getDocs(collection(db, "projects"));
+            const demoList = demoSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+            // setGlobalProjects(trackerList); // We already set it to trackerList for the main dashboard view
+            console.log(`[Admin Trace] Loaded ${trackerList.length} tracker projects and ${demoList.length} demo projects.`);
             setLoading(false);
 
             // 5. Old CSV Sync logic removed from here...
@@ -3345,13 +3600,14 @@ export default function AdminDashboard() {
                     activeProjects={activeProjects}
                     pendingPayments={pendingPayments}
                     totalTickets={totalTickets}
+                    totalRevenue={totalRevenue}
                     teamMembers={teamMembers}
                     allUsers={allUsers}
                     onAddMember={handleAddTeamMember}
                     onDeleteMember={handleDeleteTeamMember}
                 />
             );
-            case "projects": return <AdminProjectTracker teamMembers={teamMembers} paymentRequests={paymentRequests} />;
+            case "projects": return <AdminProjectTracker teamMembers={teamMembers} paymentRequests={paymentRequests} allUsers={allUsers} />;
             case "active-ids": return <AssignedProjectsSection projects={globalProjects} users={allUsers} onDelete={handleDeleteProjectID} isSuperAdmin={isSuperAdmin} />;
             case "notifications": return <AdminNotificationsSection user={user} allUsers={allUsers} />;
             case "users":
@@ -3361,7 +3617,7 @@ export default function AdminDashboard() {
             case "support": return <AdminSupportSection />;
             case "blog-management": return <BlogManagementSection user={user} />;
             case "finance":
-                return <FinanceSection assignedProjects={globalProjects} isSuperAdmin={isSuperAdmin} user={user} />;
+                return <FinanceSection assignedProjects={globalProjects} totalRevenue={totalRevenue} isSuperAdmin={isSuperAdmin} user={user} />;
             case "publish":
                 if (user?.role === 'Team_Member') return <div className="p-8 text-center text-red-500 font-bold">Access Denied: Admin Only</div>;
                 return <ProjectPublishSection />;

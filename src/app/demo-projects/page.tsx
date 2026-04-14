@@ -8,10 +8,9 @@ import { formatTimeAgo } from "@/lib/utils";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { FadeUp } from "@/components/MotionWrappers";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useEffect } from "react";
-
 // Project Data - Add new projects here
 const projects = [
     {
@@ -92,6 +91,11 @@ const ProjectCard = ({ project, mounted }: { project: typeof projects[0], mounte
             </div>
 
             <div className="p-4 flex flex-col flex-grow">
+                {project.category && (
+                    <span className="inline-block px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold uppercase tracking-wider mb-2 w-fit">
+                        {project.category}
+                    </span>
+                )}
                 <h3 className="text-lg font-bold text-slate-800 mb-1 leading-snug">{project.title}</h3>
                 <p className="text-slate-500 text-xs mb-4 leading-relaxed flex-grow line-clamp-3">
                     {project.description}
@@ -119,13 +123,17 @@ export default function DemoProjectsPage() {
         setMounted(true);
         const fetchDbProjects = async () => {
             try {
-                const q = query(collection(db, "projects"), orderBy("createdAt", "desc"));
+                const q = query(collection(db, "projects"), where("isPublished", "==", true), orderBy("createdAt", "desc"));
                 const snapshot = await getDocs(q);
-                const fetched = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data(),
-                    demoUrl: (doc.data() as any).url || "#",
-                }));
+                const fetched = snapshot.docs.map(doc => {
+                    const data = doc.data() as any;
+                    return {
+                        id: doc.id,
+                        ...data,
+                        title: data.clientProject?.projectName || data.title || "Unknown Project",
+                        demoUrl: data.url || "#",
+                    };
+                });
                 setDbProjects(fetched);
             } catch (error) {
                 console.error("Error fetching projects:", error);

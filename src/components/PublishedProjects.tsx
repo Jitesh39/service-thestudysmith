@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, limit, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { ArrowRight, Briefcase, Clock } from "lucide-react";
 import { formatTimeAgo } from "@/lib/utils";
@@ -12,6 +12,11 @@ interface Project {
     url?: string;
     image: string;
     createdAt?: any;
+    isPublished?: boolean;
+    clientProject?: {
+        projectName: string;
+        [key: string]: any;
+    };
 }
 
 const PublishedProjects = ({ limitCount = 3 }: { limitCount?: number }) => {
@@ -25,11 +30,23 @@ const PublishedProjects = ({ limitCount = 3 }: { limitCount?: number }) => {
             try {
                 const q = query(
                     collection(db, "projects"),
+                    where("isPublished", "==", true),
                     orderBy("createdAt", "desc"),
                     limit(limitCount)
                 );
                 const snapshot = await getDocs(q);
-                setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Project));
+                const fetched = snapshot.docs.map(doc => {
+                    const data = doc.data() as any;
+                    return {
+                        id: doc.id,
+                        ...data,
+                        title: data.clientProject?.projectName || data.projectName || data.title || "Untitled Project",
+                        description: data.clientProject?.description || data.description || "",
+                        // image is usually outside or part of clientProject? Let's check both
+                        image: data.image || data.clientProject?.image || "",
+                    };
+                });
+                setProjects(fetched);
             } catch (error) {
                 console.error("Error fetching projects:", error);
             } finally {
@@ -64,7 +81,7 @@ const PublishedProjects = ({ limitCount = 3 }: { limitCount?: number }) => {
                             </div>
                         )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
-                                                {/* Time Ago Badge */}
+                        {/* Time Ago Badge */}
                         {mounted && (
                             <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-sm flex items-center gap-1.5 border border-white/20">
                                 <Clock size={12} className="text-blue-600" />

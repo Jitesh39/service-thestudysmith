@@ -85,14 +85,14 @@ const menuItems = [
 // Placeholder Components for Sections
 const OverviewSection = ({ user, projects, tickets, loading }: { user: any; projects: any[]; tickets: any[]; loading: boolean }) => {
     // Count 'Pending' (Work-in-progress) as Active projects
-    const activeCount = projects.filter(p => (p.projectStatus || p.status)?.toLowerCase() === 'pending').length;
+    const activeCount = projects.filter(p => (p.clientProject?.status || p.projectStatus || p.status)?.toLowerCase() === 'pending').length;
 
     // Count 'open' support tickets
     const activeTicketsCount = tickets.filter(t => t.status === 'open').length;
 
     // Payment Logic: count 'Pending' and 'Partial'
-    const pendingPaymentsCount = projects.filter(p => (p.paymentStatus || "").toLowerCase() === 'pending').length;
-    const partialPaymentsCount = projects.filter(p => (p.paymentStatus || "").toLowerCase() === 'partial').length;
+    const pendingPaymentsCount = projects.filter(p => (p.clientProject?.paymentStatus || p.paymentStatus || "").toLowerCase() === 'pending').length;
+    const partialPaymentsCount = projects.filter(p => (p.clientProject?.paymentStatus || p.paymentStatus || "").toLowerCase() === 'partial').length;
 
     return (
         <div className="space-y-6">
@@ -208,7 +208,7 @@ const handleRazorpayPayment = async (project: any, user: any, router: any, amoun
             amount: data.amount,
             currency: data.currency,
             name: "The Study Smith",
-            description: paymentRequestId ? `Payment for Invoice: ${paymentRequestId}` : `Payment for Project: ${project?.projectName || project?.projectId}`,
+            description: paymentRequestId ? `Payment for Invoice: ${paymentRequestId}` : `Payment for Project: ${project?.clientProject?.projectName || project?.projectName || project?.projectId}`,
             order_id: data.orderId,
             handler: async function (response: any) {
                 try {
@@ -420,14 +420,14 @@ const PaymentsSection = ({ projects, user, paymentRequests }: { projects: any[],
                             </thead>
                             <tbody className="divide-y divide-slate-50">
                                 {projects.map((p, i) => {
-                                    const status = (p.paymentStatus || "").toLowerCase();
+                                    const status = (p.clientProject?.paymentStatus || p.paymentStatus || "").toLowerCase();
                                     const isPaid = status === 'paid';
                                     const isPartial = status === 'partial';
                                     const isPending = status === 'pending';
 
                                     return (
                                         <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="p-5 font-mono text-sm font-bold text-blue-600">{p.projectId || p.id}</td>
+                                            <td className="p-5 font-mono text-sm font-bold text-blue-600">{p.trackerId || p.projectId || p.id}</td>
                                             <td className="p-5">
                                                 <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${isPaid ? 'bg-green-100 text-green-700' :
                                                     isPartial ? 'bg-blue-100 text-blue-700' :
@@ -444,13 +444,13 @@ const PaymentsSection = ({ projects, user, paymentRequests }: { projects: any[],
                                                 ) : (
                                                     <button
                                                         onClick={() => handlePayNow(p)}
-                                                        disabled={loadingPaymentId === p.projectId}
-                                                        className={`px-4 py-2 border text-[10px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 shadow-lg flex items-center gap-2 ${loadingPaymentId === p.projectId
+                                                        disabled={loadingPaymentId === (p.trackerId || p.projectId || p.id)}
+                                                        className={`px-4 py-2 border text-[10px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 shadow-lg flex items-center gap-2 ${loadingPaymentId === (p.trackerId || p.projectId || p.id)
                                                             ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
                                                             : "bg-blue-600 border-blue-600 text-white hover:bg-blue-700 shadow-blue-100"
                                                             }`}
                                                     >
-                                                        {loadingPaymentId === p.projectId ? (
+                                                        {loadingPaymentId === (p.trackerId || p.projectId || p.id) ? (
                                                             <><Loader2 className="animate-spin" size={12} /> Loading...</>
                                                         ) : (
                                                             isPartial ? "Pay Remaining" : "Pay Now"
@@ -478,26 +478,26 @@ const PaymentsSection = ({ projects, user, paymentRequests }: { projects: any[],
                     <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 overflow-hidden p-8 space-y-6">
                         <div className="text-center space-y-2">
                             <h3 className="text-2xl font-black text-slate-900">Choose Payment <br /><span className="text-blue-600">Mode</span></h3>
-                            <p className="text-slate-500 text-sm font-medium">{selectedProject.projectName}</p>
+                            <p className="text-slate-500 text-sm font-medium">{selectedProject.clientProject?.projectName || selectedProject.projectName}</p>
                         </div>
 
                         <div className="grid grid-cols-1 gap-4">
                             <button
-                                onClick={() => processPayment(selectedProject.totalAmount - (selectedProject.paidAmount || 0))}
+                                onClick={() => processPayment((selectedProject.clientProject?.totalAmount || selectedProject.totalAmount) - (selectedProject.clientProject?.receivedAmount || selectedProject.paidAmount || 0))}
                                 className="flex flex-col items-center justify-center p-6 border-2 border-slate-100 rounded-2xl hover:border-blue-600 hover:bg-blue-50/30 transition-all group"
                             >
                                 <span className="text-slate-400 group-hover:text-blue-600 text-[10px] font-black uppercase tracking-widest mb-1">Full Amount</span>
-                                <span className="text-xl font-black text-slate-900 group-hover:text-blue-700">₹{selectedProject.totalAmount - (selectedProject.paidAmount || 0)}</span>
+                                <span className="text-xl font-black text-slate-900 group-hover:text-blue-700">₹{(selectedProject.clientProject?.totalAmount || selectedProject.totalAmount) - (selectedProject.clientProject?.receivedAmount || selectedProject.paidAmount || 0)}</span>
                             </button>
 
                             {/* Only show 50% option if no payment has been made yet */}
-                            {(!selectedProject.paidAmount || selectedProject.paidAmount === 0) && (
+                            {(!(selectedProject.clientProject?.receivedAmount || selectedProject.paidAmount) || (selectedProject.clientProject?.receivedAmount || selectedProject.paidAmount) === 0) && (
                                 <button
-                                    onClick={() => processPayment(selectedProject.totalAmount * 0.5)}
+                                    onClick={() => processPayment((selectedProject.clientProject?.totalAmount || selectedProject.totalAmount) * 0.5)}
                                     className="flex flex-col items-center justify-center p-6 border-2 border-slate-100 rounded-2xl hover:border-green-600 hover:bg-green-50/30 transition-all group"
                                 >
                                     <span className="text-slate-400 group-hover:text-green-600 text-[10px] font-black uppercase tracking-widest mb-1">50% Advance</span>
-                                    <span className="text-xl font-black text-slate-900 group-hover:text-green-700">₹{selectedProject.totalAmount * 0.5}</span>
+                                    <span className="text-xl font-black text-slate-900 group-hover:text-green-700">₹{(selectedProject.clientProject?.totalAmount || selectedProject.totalAmount) * 0.5}</span>
                                 </button>
                             )}
                         </div>
@@ -536,8 +536,8 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
 
     const filteredProjects = projects.filter(p => {
         const search = projSearch.toLowerCase();
-        const id = String(p.projectId || p.id || "").toLowerCase();
-        const name = String(p.projectName || p.title || "").toLowerCase();
+        const id = String(p.trackerId || p.projectId || p.id || "").toLowerCase();
+        const name = String(p.clientProject?.projectName || p.projectName || p.title || "").toLowerCase();
         return id.includes(search) || name.includes(search);
     });
 
@@ -589,14 +589,15 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
 
             for (const proj of projects) {
                 const matched = allData.find(row => {
-                    const rowId = row['project id'] || row['id'] || row['projectid'];
+                    const rowId = row['project id'] || row['id'] || row['projectid'] || row['trackerid'];
                     const rowEmail = row['email address'] || row['email'] || row['client email'];
-                    return rowId === proj.projectId && rowEmail?.toLowerCase() === user.email?.toLowerCase();
+                    return rowId === (proj.trackerId || proj.projectId) && rowEmail?.toLowerCase() === user.email?.toLowerCase();
                 });
 
                 if (matched) {
-                    await setDoc(doc(collection(db, "users", user.uid, "assignedProjects"), proj.projectId), {
-                        projectId: proj.projectId,
+                    const currentId = proj.trackerId || proj.projectId;
+                    await setDoc(doc(collection(db, "users", user.uid, "assignedProjects"), currentId), {
+                        projectId: currentId,
                         projectName: matched['project name'] || matched['title'] || proj.projectName || proj.title || "Untitled Project",
                         projectStatus: matched['project status'] || matched['status'] || proj.projectStatus || proj.status || "Pending",
                         enquireDate: matched['enquire date'] || matched['date'] || proj.enquireDate || proj.date || "",
@@ -662,6 +663,7 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
                                 <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Project ID</th>
                                 <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Project Name</th>
                                 <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Enquire Date</th>
+                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Linked Email</th>
                                 <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Target Date</th>
                                 <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Status</th>
                                 <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Payment</th>
@@ -674,37 +676,44 @@ const ProjectsSection = ({ user, loading, projects }: { user: any; loading: bool
                                     <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
                                         <td className="p-4">
                                             <span className="font-mono text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                                                {proj.projectId || proj.id}
+                                                {proj.trackerId || proj.projectId || proj.id}
                                             </span>
                                         </td>
                                         <td className="p-4">
-                                            <p className="font-bold text-slate-800">{proj.projectName || proj.title}</p>
+                                            <p className="font-bold text-slate-800">{proj.clientProject?.projectName || proj.projectName || proj.title}</p>
                                         </td>
                                         <td className="p-4 text-slate-500 text-sm text-center">
-                                            {formatDate(proj.enquireDate || proj.date)}
+                                            {formatDate(proj.clientProject?.enquireDate || proj.enquireDate || proj.date)}
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <p className="text-[10px] font-medium text-slate-500 lowercase">{proj.clientProject?.email || proj.clientEmail || 'N/A'}</p>
                                         </td>
                                         <td className="p-4 text-center">
                                             <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
-                                                {formatDate(proj.targetDate)}
+                                                {formatDate(proj.clientProject?.targetDate || proj.targetDate)}
                                             </span>
                                         </td>
                                         <td className="p-4 text-center">
-                                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${(proj.projectStatus || proj.status)?.toLowerCase() === 'completed' ? 'bg-green-100 text-green-700' :
-                                                (proj.projectStatus || proj.status)?.toLowerCase() === 'active' ? 'bg-blue-100 text-blue-700' :
+                                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${(proj.clientProject?.status || proj.projectStatus || proj.status)?.toLowerCase() === 'completed' ? 'bg-green-100 text-green-700' :
+                                                (proj.clientProject?.status || proj.projectStatus || proj.status)?.toLowerCase() === 'active' || (proj.clientProject?.status || proj.projectStatus || proj.status)?.toLowerCase() === 'in progress' ? 'bg-blue-100 text-blue-700' :
                                                     'bg-yellow-100 text-yellow-700'
                                                 }`}>
-                                                {proj.projectStatus || proj.status}
+                                                {proj.clientProject?.status || proj.projectStatus || proj.status}
                                             </span>
                                         </td>
-                                        <td className="p-4 text-center font-bold text-slate-700">
-                                            ₹{proj.totalAmount || proj.payment || '0'}
+                                        <td className="p-4 text-center">
+                                            <div className="flex flex-col">
+                                                <span className="font-bold text-slate-700">₹{parseFloat(proj.clientProject?.receivedAmount || proj.paidAmount || 0).toLocaleString()}</span>
+                                                <span className="text-[10px] text-slate-400 font-bold uppercase">of ₹{parseFloat(proj.clientProject?.totalAmount || proj.totalAmount || 0).toLocaleString()}</span>
+                                            </div>
                                         </td>
                                         <td className="p-4 text-center">
-                                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${(proj.paymentStatus)?.toLowerCase() === 'paid' ? 'bg-green-100 text-green-700' :
-                                                (proj.paymentStatus)?.toLowerCase() === 'partial' || (proj.paymentStatus)?.toLowerCase().includes('50%') ? 'bg-blue-100 text-blue-700' :
-                                                    'bg-red-100 text-red-700'
-                                                }`}>
-                                                {proj.paymentStatus || 'Pending'}
+                                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${
+                                                (proj.clientProject?.paymentStatus || proj.paymentStatus || "").toLowerCase() === 'paid' ? 'bg-green-100 text-green-700' :
+                                                (proj.clientProject?.paymentStatus || proj.paymentStatus || "").toLowerCase() === 'partial' ? 'bg-blue-100 text-blue-700' :
+                                                'bg-yellow-100 text-yellow-700'
+                                            }`}>
+                                                {proj.clientProject?.paymentStatus || proj.paymentStatus || 'Pending'}
                                             </span>
                                         </td>
                                     </tr>
@@ -1417,29 +1426,35 @@ export default function ClientDashboard() {
     }, [router]);
 
     useEffect(() => {
-        if (!user?.email) return;
+        if (!user?.uid) return;
+
+        console.log("[Client Trace] Current User UID:", user.uid);
 
         const q = query(
-            collection(db, "projects"),
-            where("email", "==", user.email.toLowerCase())
+            collection(db, "projectTracker"),
+            where("clientId", "==", user.uid)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const projectsList = snapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() as any }))
+                .map(doc => {
+                    const data = doc.data() as any;
+                    console.log(`[Client Trace] Project ID: ${data.trackerId || data.projectId}, Field clientId: ${data.clientId}`);
+                    return { id: doc.id, ...data };
+                })
                 .sort((a, b) => {
                     const dateA = a.createdAt?.seconds || 0;
                     const dateB = b.createdAt?.seconds || 0;
                     return dateB - dateA;
                 });
-            console.log("[Projects Trace] IDs & Amounts:", projectsList.map(p => `${p.projectId}: Total=${p.totalAmount}, Payment=${p.payment}`));
+
             setProjects(projectsList);
         }, (error) => {
             console.error("Projects Real-time Error:", error);
         });
 
         return () => unsubscribe();
-    }, [user?.email]);
+    }, [user?.uid]);
 
     // Fetch Tickets (One-time Fetch: Reduces reads)
     // Users rarely need real-time updates for ticket lists unless actively chatting

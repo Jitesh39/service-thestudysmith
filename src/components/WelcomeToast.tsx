@@ -16,11 +16,17 @@ const WelcomeToast = () => {
   }, []);
 
   useEffect(() => {
-    // Show the toast every time the page is refreshed
-    const timer = setTimeout(() => {
-      setIsVisible(true);
-    }, 1200);
-    return () => clearTimeout(timer);
+    // Check if user has visited before to prevent showing on every refresh
+    const hasVisited = localStorage.getItem("hasVisited");
+
+    if (!hasVisited) {
+      const timer = setTimeout(() => {
+        setIsVisible(true);
+        // Mark as visited so it doesn't show again
+        localStorage.setItem("hasVisited", "true");
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
   }, []);
 
   useEffect(() => {
