@@ -32,6 +32,7 @@ interface Project {
   description: string;
   image: string;
   url?: string;
+  category?: string;
   createdAt?: any;
 }
 

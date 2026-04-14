@@ -11,6 +11,7 @@ interface Project {
     description: string;
     url?: string;
     image: string;
+    category?: string;
     createdAt?: any;
     isPublished?: boolean;
     clientProject?: {

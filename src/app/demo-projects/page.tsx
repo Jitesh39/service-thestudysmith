@@ -11,50 +11,65 @@ import { FadeUp } from "@/components/MotionWrappers";
 import { collection, getDocs, query, orderBy, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useEffect } from "react";
-// Project Data - Add new projects here
-const projects = [
+interface DemoProject {
+    title: string;
+    description: string;
+    image: string;
+    theme?: "blue" | "emerald" | "violet";
+    demoUrl: string;
+    category?: string;
+    createdAt?: any;
+}
+
+const projects: DemoProject[] = [
     {
         title: "ResumeForge AI",
         description: "A simple platform that offers ready-to-use resume templates to help you build a professional CV quickly and easily.",
         image: "project-demo/resumeforgeai.png",
         theme: "blue",
+        category: "Productive Tool",
         demoUrl: "https://resumeforgeai-pi.vercel.app/"
     },
     {
         title: "MyLifeInfo Vault",
         description: "A secure digital platform to store, organize, and share essential will and emergency information when it matters most.",
         image: "project-demo/mylifeinfo.png",
+        category: "Social Impact",
         demoUrl: "https://mylifeinfo-vault.vercel.app/"
     },
     {
         title: "TheStudySmith",
         description: "TheStudySmith is an all-in-one academic platform for Parul University students, providing organized study materials, notes, question banks, and helpful resources to make learning simpler, faster, and more effective.",
         image: "project-demo/thestudysmith.png",
+        category: "Educational",
         demoUrl: "https://thestudysmith9.wordpress.com"
     },
     {
         title: "VivaMentor",
         description: "VivaMentor is a focused learning platform that helps students confidently prepare for project reviews and viva examinations.",
         image: "project-demo/vivamentor.png",
+        category: "Learning Platform",
         demoUrl: "https://vivamentor.vercel.app/"
     },
     {
         title: "CivicTrack",
         description: "A civic issue reporting and tracking platform that helps communities raise, monitor, and resolve local problems transparently.",
         image: "project-demo/civictrack.png",
+        category: "Civic Tech",
         demoUrl: "https://civictrack-mu.vercel.app/"
     },
     {
         title: "Service-TheStudySmith",
         description: "A service platform by TheStudySmith that helps students get simple, professional static websites quickly and affordably.",
         image: "project-demo/service-thestudysmith.png",
+        category: "Service Platform",
         demoUrl: "https://service-thestudysmith.vercel.app/"
     }
 
 ];
 
 // Reusable Project Card Component - Memoized to prevent re-renders (optional but good practice)
-const ProjectCard = ({ project, mounted }: { project: typeof projects[0], mounted: boolean }) => {
+const ProjectCard = ({ project, mounted }: { project: DemoProject, mounted: boolean }) => {
     // Dynamic styling based on theme
     const themeStyles = {
         blue: { gradient: "from-blue-500 to-indigo-600", pill: "bg-blue-50 text-blue-600" },
